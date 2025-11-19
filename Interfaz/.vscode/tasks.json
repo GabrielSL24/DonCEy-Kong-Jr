@@ -1,0 +1,35 @@
+{
+    "version": "2.0.0",
+    "tasks": [
+        {
+            "label": "build",
+            "type": "shell",
+            "command": "gcc",
+            "args": [
+                "-o", "game.exe",
+                "main.c", "game.c", "graficos.c", "controles.c", "conexion.c",
+                "-I", "C:/raylib/raylib/src",
+                "-L", "C:/raylib/raylib/src", 
+                "-lraylib",
+                "-lopengl32",
+                "-lgdi32", 
+                "-lwinmm",
+                "-DPLATFORM_DESKTOP",
+                "-Wall", 
+                "-std=c99"
+            ],
+            "group": {
+                "kind": "build",
+                "isDefault": true
+            },
+            "problemMatcher": ["$gcc"]
+        },
+        {
+            "label": "clean",
+            "type": "shell",
+            "command": "del",
+            "args": ["game.exe", "*.o"],
+            "group": "build"
+        }
+    ]
+}
