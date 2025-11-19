@@ -1,7 +1,9 @@
 #ifndef MESSAGE_ADAPTER_H
 #define MESSAGE_ADAPTER_H
 
-#include <WinSock2.h>
+// Solo forward declaration de SOCKET, no incluir winsock2 aquí
+typedef unsigned long long SOCKET;
+#define INVALID_SOCKET (SOCKET)(~0)
 
 #define CLIENT_JUGADOR 1
 #define CLIENT_ESPECTADOR 2

@@ -5,12 +5,17 @@ import java.net.Socket;
 public class AdapterJ {
     private DataInputStream input;
     private DataOutputStream output;
+    private Socket socket;
 
     public AdapterJ(Socket socket) throws IOException {
+        this.socket = socket;
         this.input = new DataInputStream(socket.getInputStream());
         this.output = new DataOutputStream(socket.getOutputStream());
     }
 
+    public boolean hayDatosDisponibles() throws IOException {
+        return input.available() > 0;
+    }
 
     public void sendInt(int value) throws IOException {
         output.writeInt(value);
@@ -40,6 +45,7 @@ public class AdapterJ {
             case "JUGADOR": return 1;
             case "ESPECTADOR": return 2;
             case "ADMIN": return 3;
+            case "SERVIDOR": return 4;
             default: return 0;
         }
     }
@@ -49,6 +55,7 @@ public class AdapterJ {
             case 1: return "JUGADOR";
             case 2: return "ESPECTADOR";
             case 3: return "ADMIN";
+            case 4: return "SERVIDOR";  
             default: return "DESCONOCIDO";
         }
     }

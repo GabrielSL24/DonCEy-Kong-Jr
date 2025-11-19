@@ -1,4 +1,3 @@
-
 import java.net.*;
 import java.io.*;
 import java.util.*;
@@ -31,6 +30,8 @@ public class SocketServidor {
                 ClientHandler clientHandler = new ClientHandler(client, this);
                 clientes.add(clientHandler);
                 new Thread(clientHandler).start();
+
+                 System.out.println("🎯 Juegos activos: " + clientes.size());
             }
         } catch (Exception e) {
             e.printStackTrace();
@@ -39,7 +40,7 @@ public class SocketServidor {
 
     public void removeClient(ClientHandler client) {
         clientes.remove(client);
-        System.out.println("Cliente desonectado. Total: " + clientes.size());
+        System.out.println("➖ Cliente desconectado. Juegos activos: " + clientes.size());
     }
 }
 
