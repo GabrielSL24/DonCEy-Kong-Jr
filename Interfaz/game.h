@@ -107,8 +107,6 @@ bool celda_es_mortal(int tipo_celda);
 // Funciones de movimiento basadas en matriz
 bool esta_en_superficie_matriz(Jugador *jugador, MatrizJuego *matriz);
 int liana_mas_cercana_matriz(Jugador *jugador, MatrizJuego *matriz);
-void actualizar_posicion_desde_matriz(EstadoJuego *estado);
-
 
 // Funciones obsoletas (mantener temporalmente para compilación)
 bool esta_en_superficie(Jugador *jugador, EstadoJuego *estado);

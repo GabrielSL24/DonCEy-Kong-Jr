@@ -5,72 +5,101 @@
 #include "raymath.h"
 
 void inicializar_juego(EstadoJuego *estado) {
-    //printf("=== INICIALIZANDO JUEGO ===\n");
+    printf("=== INICIALIZANDO JUEGO ===\n");
     
-    // INICIALIZAR EL PADRE PRIMERO
+    // INICIALIZAR EL PADRE (Donkey Kong), TODO Corregir posicion xd
     estado->padre = (Padre){
         (MATRIZ_COLUMNAS/2) * TAMANIO_CELDA + TAMANIO_CELDA/2,  // Centro de la pantalla
         2 * TAMANIO_CELDA + TAMANIO_CELDA/2,                    // Sobre plataforma superior
         true
     };
-    //printf("Padre inicializado en: x=%.1f, y=%.1f\n", estado->padre.x, estado->padre.y);
+    printf("Padre inicializado en: x=%.1f, y=%.1f\n", estado->padre.x, estado->padre.y);
     
-    // Islas - POSICIONES FIJAS PARA DEBUG
-    estado->num_islas = 3;
-    estado->islas[0] = (Isla){100, 400, 200, COLOR_ISLA_VERDE, COLOR_ISLA_SUELO};
-    estado->islas[1] = (Isla){300, 300, 150, COLOR_ISLA_VERDE, COLOR_ISLA_SUELO};
-    estado->islas[2] = (Isla){500, 450, 180, COLOR_ISLA_VERDE, COLOR_ISLA_SUELO};
+    // ==================== 10 ISLAS/SUPERFICIES ====================
+    estado->num_islas = 10;
+    //Se recibe x, y, ancho, color_superior, color_inferior
+    // NIVEL INFERIOR (5 islas) - y > 450
+    estado->islas[0] = (Isla){0, 550, 200, COLOR_ISLA_VERDE, COLOR_ISLA_SUELO};     // Isla 0: INFERIOR IZQUIERDA
+    estado->islas[2] = (Isla){420, 520, 80, COLOR_ISLA_VERDE, COLOR_ISLA_SUELO};    // Isla 2: INFERIOR CENTRO-DERECHA  
+    estado->islas[3] = (Isla){550, 500, 80, COLOR_ISLA_VERDE, COLOR_ISLA_SUELO};    // Isla 3: INFERIOR DERECHA
+    estado->islas[4] = (Isla){300, 500, 90, COLOR_ISLA_VERDE, COLOR_ISLA_SUELO};    // Isla 4: INFERIOR CENTRO
+    estado->islas[5] = (Isla){670, 460, 100, COLOR_ISLA_VERDE, COLOR_ISLA_SUELO};   // Isla 5: INFERIOR EXTREMA DERECHA
+
+    // NIVEL MEDIO (3 islas) - 200 < y < 450
+    estado->islas[1] = (Isla){130, 220, 100, COLOR_ISLA_VERDE, COLOR_ISLA_SUELO};   // Isla 1: MEDIA IZQUIERDA
+    estado->islas[7] = (Isla){130, 340, 150, COLOR_ISLA_VERDE, COLOR_ISLA_SUELO};   // Isla 7: MEDIA IZQUIERDA-ALTA
+    estado->islas[9] = (Isla){600, 280, 180, COLOR_ISLA_VERDE, COLOR_ISLA_SUELO};   // Isla 9: MEDIA DERECHA
+
+    // NIVEL SUPERIOR (2 islas) - y < 200  
+    estado->islas[6] = (Isla){460, 80, 200, COLOR_ISLA_VERDE, COLOR_ISLA_SUELO};    // Isla 6: SUPERIOR DERECHA
+    estado->islas[8] = (Isla){0, 60, 460, COLOR_ISLA_VERDE, COLOR_ISLA_SUELO};      // Isla 8: SUPERIOR IZQUIERDA GIGANTE
+
     
-    //printf("Islas disponibles:\n");
-    for (int i = 0; i < estado->num_islas; i++) {
-        //printf("Isla %d: x=%.1f, y=%.1f, ancho=%.1f\n", 
-               //i, estado->islas[i].x, estado->islas[i].y, estado->islas[i].ancho);
-    }
-    
-    // Jugador - posición CORREGIDA sobre isla 1
+    // ==================== JUGADOR (DK Jr) ====================
+    // Posicion inicial en la isla 0
     estado->jugador = (Jugador){
-        estado->islas[1].x + estado->islas[1].ancho/2,  // 300 + 75 = 375
-        estado->islas[1].y - JUGADOR_HITBOX/2 - 1,      // 300 - 6 - 1 = 293 (SOBRE la isla)
-        0, 0, 3, 0, true, ESTADO_SUELO, -1, true, 0
+        estado->islas[0].x + 50,  
+        estado->islas[0].y - JUGADOR_HITBOX,  // Justo sobre la isla
+        0, 0, 3, 0, true, ESTADO_SUELO, -1, true, true, 0
     };
-        
-    //printf("Jugador inicializado en: x=%.1f, y=%.1f\n", 
-           //estado->jugador.x, estado->jugador.y);
+            
+    printf("Jugador inicializado en: x=%.1f, y=%.1f (Isla 0)\n", 
+           estado->jugador.x, estado->jugador.y);
     
-    // Plataforma superior
-    estado->plataforma_superior = (Plataforma){0, 2 * TAMANIO_CELDA, SCREEN_WIDTH};
+    // ==================== PLATAFORMA SUPERIOR ====================
+    //estado->plataforma_superior = (Plataforma){0, 2 * TAMANIO_CELDA, SCREEN_WIDTH}; // caca, ignorar
     
-    // Lianas - posiciones basadas en columnas de matriz
-    estado->num_lianas = 4;
-    estado->lianas[0] = (Liana){4 * TAMANIO_CELDA, 2 * TAMANIO_CELDA, 13 * TAMANIO_CELDA};  // Columna 4
-    estado->lianas[1] = (Liana){8 * TAMANIO_CELDA, 2 * TAMANIO_CELDA, 13 * TAMANIO_CELDA};  // Columna 8  
-    estado->lianas[2] = (Liana){12 * TAMANIO_CELDA, 2 * TAMANIO_CELDA, 13 * TAMANIO_CELDA}; // Columna 12
-    estado->lianas[3] = (Liana){16 * TAMANIO_CELDA, 2 * TAMANIO_CELDA, 13 * TAMANIO_CELDA}; // Columna 16
+    // ==================== 9 LIANAS ====================
+    estado->num_lianas = 9;
     
-    // Frutas - posiciones en celdas específicas
-    estado->num_frutas = 4;
-    estado->frutas[0] = (Fruta){5 * TAMANIO_CELDA, 6 * TAMANIO_CELDA, 100, FRUTA_NARANJA, true};
-    estado->frutas[1] = (Fruta){9 * TAMANIO_CELDA, 5 * TAMANIO_CELDA, 150, FRUTA_CELESTE, true};
-    estado->frutas[2] = (Fruta){13 * TAMANIO_CELDA, 7 * TAMANIO_CELDA, 200, FRUTA_ROJA, true};
-    estado->frutas[3] = (Fruta){15 * TAMANIO_CELDA, 9 * TAMANIO_CELDA, 120, FRUTA_BANANO, true};
+    // Lianas espaciadas horizontalmente , los comentarios estan mal 
+    //aca cada struct recibe: x, y_inicio, y_fin
+    estado->lianas[0] = (Liana){40, 80, 480 };   // Liana 1 - sobre isla 0
+    estado->lianas[1] = (Liana){110, 80, 470};  // Liana 2 - sobre isla 4  
+    estado->lianas[2] = (Liana){200, 220, 490};  // Liana 3 - entre islas
+    estado->lianas[3] = (Liana){320, 80, 410};  // Liana 4 - sobre isla 5  
+    estado->lianas[4] = (Liana){450, 80, 300};  // Liana 5 - entre islas
+    estado->lianas[5] = (Liana){520, 120, 400};  // Liana 6 - sobre isla 6
+    estado->lianas[6] = (Liana){580, 130, 350};  // Liana 7 - sobre isla 9
+    estado->lianas[7] = (Liana){680, 50, 400};  // Liana 8 - extremo derecho
+    estado->lianas[8] = (Liana){750, 50, 400};  // Liana 8 - extremo derecho
     
-    // Cocodrilos
-    estado->num_cocodrilos = 3;
-    estado->cocodrilos[0] = (Cocodrilo){6 * TAMANIO_CELDA, 9 * TAMANIO_CELDA, 0, true};
-    estado->cocodrilos[1] = (Cocodrilo){10 * TAMANIO_CELDA, 7 * TAMANIO_CELDA, 1, true};
-    estado->cocodrilos[2] = (Cocodrilo){14 * TAMANIO_CELDA, 10 * TAMANIO_CELDA, 0, true};
+    
+    printf("Lianas inicializadas: %d\n", estado->num_lianas);
+    
+    // ==================== FRUTAS ====================
+    estado->num_frutas = 8; 
+    
+    // Frutas en varias islas
+    estado->frutas[0] = (Fruta){estado->islas[7].x + 30, estado->islas[7].y - 20, 100, FRUTA_NARANJA, true};
+    estado->frutas[1] = (Fruta){estado->islas[7].x + 20, estado->islas[7].y - 20, 150, FRUTA_CELESTE, true};
+    estado->frutas[2] = (Fruta){estado->islas[7].x + 40, estado->islas[7].y - 20, 200, FRUTA_ROJA, true};
+    estado->frutas[3] = (Fruta){estado->islas[7].x + 25, estado->islas[7].y - 20, 120, FRUTA_BANANO, true};
+    estado->frutas[4] = (Fruta){estado->islas[7].x + 50, estado->islas[7].y - 20, 180, FRUTA_NARANJA, true};
+    estado->frutas[5] = (Fruta){estado->islas[7].x + 20, estado->islas[7].y - 20, 140, FRUTA_CELESTE, true};
+    estado->frutas[6] = (Fruta){estado->islas[7].x + 30, estado->islas[7].y - 20, 160, FRUTA_ROJA, true};
+    estado->frutas[7] = (Fruta){estado->islas[7].x + 40, estado->islas[7].y - 20, 130, FRUTA_BANANO, true};
+    
+    // ==================== COCODRILOS ====================
+    estado->num_cocodrilos = 5;  
+    
+    estado->cocodrilos[0] = (Cocodrilo){estado->islas[8].x + 60, estado->islas[8].y - 15, 0, true};  // Rojo
+    estado->cocodrilos[1] = (Cocodrilo){estado->islas[8].x + 40, estado->islas[8].y - 15, 1, true};  // Azul
+    estado->cocodrilos[2] = (Cocodrilo){estado->islas[8].x + 30, estado->islas[8].y - 15, 0, true};  // Rojo
+    estado->cocodrilos[3] = (Cocodrilo){estado->islas[8].x + 20, estado->islas[8].y - 15, 1, true};  // Azul
+    estado->cocodrilos[4] = (Cocodrilo){estado->islas[8].x + 50, estado->islas[8].y - 15, 0, true};  // Rojo
     
     estado->juego_activo = true;
     
     // Inicializar matriz
     inicializar_matriz(&estado->matriz, estado);
 
-    // En inicializar_juego, deja SOLO estos:
-    //printf("=== VERIFICACIÓN INICIAL ===\n");
-    //printf("Isla 1: y=%.1f, Jugador: y=%.1f\n", estado->islas[1].y, estado->jugador.y);
-    //printf("Jugador DEBERÍA estar sobre la isla: %s\n", 
-        //(estado->jugador.y < estado->islas[1].y) ? "SÍ" : "NO");
-
+    printf("=== VERIFICACION INICIAL ===\n");
+    printf("Jugador en isla %d: (%.1f, %.1f)\n", 5, estado->jugador.x, estado->jugador.y);
+    printf("Jugador DEBERIA estar sobre la isla: %s\n", 
+        (estado->jugador.y < estado->islas[5].y) ? "SÍ" : "NO");
+    printf("Total elementos: %d islas, %d lianas, %d frutas, %d cocodrilos\n",
+           estado->num_islas, estado->num_lianas, estado->num_frutas, estado->num_cocodrilos);
 }
 
 // ==================== SISTEMA DE MATRIZ ====================
@@ -82,7 +111,7 @@ void coordenadas_a_matriz(float x, float y, int *fila, int *columna) {
     //printf("Coordenadas a matriz: (%.1f,%.1f) -> [%d,%d] (TAMANIO_CELDA=%d)\n", 
           // x, y, *fila, *columna, TAMANIO_CELDA);
     
-    // Asegurar que esté dentro de los límites
+    // Asegura que este dentro de los límites
     if (*fila < 0) *fila = 0;
     if (*fila >= MATRIZ_FILAS) *fila = MATRIZ_FILAS - 1;
     if (*columna < 0) *columna = 0;
@@ -97,7 +126,7 @@ void matriz_a_coordenadas(int fila, int columna, float *x, float *y) {
 }
 
 bool celda_es_solida(int tipo_celda) {
-    // TEMPORAL: Casi todo es sólido excepto vacío, agua y lianas
+    // TEMPORAL: Casi todo es sólido excepto vacio, agua y lianas 
     return (tipo_celda != TIPO_VACIO && 
             tipo_celda != TIPO_AGUA && 
             tipo_celda != TIPO_LIANA);
@@ -112,9 +141,9 @@ bool celda_es_mortal(int tipo_celda) {
 }
 
 void inicializar_matriz(MatrizJuego *matriz, EstadoJuego *estado) {
-    //printf("=== INICIALIZANDO MATRIZ ===\n");
-    //printf("MATRIZ_FILAS=%d, MATRIZ_COLUMNAS=%d, TAMANIO_CELDA=%d\n", 
-           //MATRIZ_FILAS, MATRIZ_COLUMNAS, TAMANIO_CELDA);
+    printf("=== INICIALIZANDO MATRIZ ===\n");
+    printf("MATRIZ_FILAS=%d, MATRIZ_COLUMNAS=%d, TAMANIO_CELDA=%d\n", 
+           MATRIZ_FILAS, MATRIZ_COLUMNAS, TAMANIO_CELDA);
     
     // Limpiar matriz
     for (int f = 0; f < MATRIZ_FILAS; f++) {
@@ -124,7 +153,7 @@ void inicializar_matriz(MatrizJuego *matriz, EstadoJuego *estado) {
         }
     }
     
-    // Agua en las 2 últimas filas
+    // Agua en las 2 ultimas filas
     for (int f = MATRIZ_FILAS - 2; f < MATRIZ_FILAS; f++) {
         for (int c = 0; c < MATRIZ_COLUMNAS; c++) {
             matriz->celdas[f][c].tipo = TIPO_AGUA;
@@ -132,9 +161,9 @@ void inicializar_matriz(MatrizJuego *matriz, EstadoJuego *estado) {
     }
     
     // Plataforma superior (fila 1)
-    for (int c = 0; c < MATRIZ_COLUMNAS; c++) {
-        matriz->celdas[1][c].tipo = TIPO_PLATAFORMA;
-    }
+    //for (int c = 0; c < MATRIZ_COLUMNAS; c++) {
+    //    matriz->celdas[1][c].tipo = TIPO_PLATAFORMA;
+    //}
     
     // Padre en plataforma superior
     int f_padre, c_padre;
@@ -143,21 +172,21 @@ void inicializar_matriz(MatrizJuego *matriz, EstadoJuego *estado) {
         matriz->celdas[f_padre][c_padre].tipo = TIPO_PADRE;
     }
     
-    // Islas - CON DEBUG CRÍTICO
-    //printf("=== COLOCANDO ISLAS EN MATRIZ ===\n");
+    // Islas - Debug print
+    printf("=== COLOCANDO ISLAS EN MATRIZ ===\n");
     for (int i = 0; i < estado->num_islas; i++) {
         int fila, col_inicio, col_fin;
         coordenadas_a_matriz(estado->islas[i].x, estado->islas[i].y, &fila, &col_inicio);
         coordenadas_a_matriz(estado->islas[i].x + estado->islas[i].ancho, estado->islas[i].y, &fila, &col_fin);
         
-        //printf("Isla %d: coord(%.1f,%.1f) ancho=%.1f -> fila=%d, columnas=%d-%d\n",
-               //i, estado->islas[i].x, estado->islas[i].y, estado->islas[i].ancho,
-               //fila, col_inicio, col_fin);
+        printf("Isla %d: coord(%.1f,%.1f) ancho=%.1f -> fila=%d, columnas=%d-%d\n",
+               i, estado->islas[i].x, estado->islas[i].y, estado->islas[i].ancho,
+               fila, col_inicio, col_fin);
         
         for (int c = col_inicio; c <= col_fin && c < MATRIZ_COLUMNAS; c++) {
             if (c >= 0 && fila >= 0 && fila < MATRIZ_FILAS) {
                 matriz->celdas[fila][c].tipo = TIPO_PLATAFORMA;
-                //printf("  - Plataforma en [%d,%d]\n", fila, c);
+                printf("  - Plataforma en [%d,%d]\n", fila, c);
             }
         }
     }
@@ -199,38 +228,38 @@ void inicializar_matriz(MatrizJuego *matriz, EstadoJuego *estado) {
         }
     }
     
-    // Jugador - DECLARAR fila_jug y col_jug UNA SOLA VEZ
+    // Jugador
     int fila_jug, col_jug;
     coordenadas_a_matriz(estado->jugador.x, estado->jugador.y, &fila_jug, &col_jug);
     if (fila_jug >= 0 && fila_jug < MATRIZ_FILAS && col_jug >= 0 && col_jug < MATRIZ_COLUMNAS) {
         matriz->celdas[fila_jug][col_jug].tipo = TIPO_JUGADOR;
     }
 
-    //printf("=== MATRIZ INICIALIZADA ===\n");
+    printf("=== MATRIZ INICIALIZADA ===\n");
     
     // DEBUG: Mostrar estado de la matriz alrededor de donde debería estar el jugador
-    //printf("ESTADO DE LA MATRIZ alrededor de jugador:\n");
-    //printf("Jugador en matriz: [%d,%d]\n", fila_jug, col_jug); // <-- USA LAS VARIABLES YA DECLARADAS
+    printf("ESTADO DE LA MATRIZ alrededor de jugador:\n");
+    printf("Jugador en matriz: [%d,%d]\n", fila_jug, col_jug); //USA LAS VARIABLES YA DECLARADAS
     
     for (int f = fila_jug - 1; f <= fila_jug + 2; f++) {
         if (f < 0 || f >= MATRIZ_FILAS) continue;
-        //printf("Fila %2d: ", f);
+        printf("Fila %2d: ", f);
         for (int c = col_jug - 3; c <= col_jug + 3; c++) {
             if (c < 0 || c >= MATRIZ_COLUMNAS) {
-                //printf("X");
+                printf("X");
             } else {
-                //printf("%d", matriz->celdas[f][c].tipo);
+                printf("%d", matriz->celdas[f][c].tipo);
             }
         }
-        //printf("\n");
+        printf("\n");
     }
-} // <--- LLAVE DE CIERRE CORRECTA
+} 
 
 
 void actualizar_matriz_desde_estado(EstadoJuego *estado) {
     MatrizJuego *matriz = &estado->matriz;
     
-    // Limpiar posición anterior del jugador
+    // Limpiar posicion anterior del jugador
     for (int f = 0; f < MATRIZ_FILAS; f++) {
         for (int c = 0; c < MATRIZ_COLUMNAS; c++) {
             if (matriz->celdas[f][c].tipo == TIPO_JUGADOR) {
@@ -239,7 +268,7 @@ void actualizar_matriz_desde_estado(EstadoJuego *estado) {
         }
     }
     
-    // Actualizar posición del jugador
+    // Actualizar posicion del jugador
     int f_jug, c_jug;
     coordenadas_a_matriz(estado->jugador.x, estado->jugador.y, &f_jug, &c_jug);
     if (f_jug >= 0 && f_jug < MATRIZ_FILAS && c_jug >= 0 && c_jug < MATRIZ_COLUMNAS) {
@@ -263,30 +292,30 @@ void actualizar_matriz_desde_estado(EstadoJuego *estado) {
 // ==================== COLISIONES POR MATRIZ ====================
 
 bool esta_en_superficie_matriz(Jugador *jugador, MatrizJuego *matriz) {
-    //printf("=== VERIFICACIÓN DE SUELO URGENTE ===\n");
+    printf("=== VERIFICACION DE SUELO URGENTE ===\n");
     
-    // Posición exacta del jugador
+    // Posicion exacta del jugador
     float base_jugador = jugador->y + JUGADOR_HITBOX/2;
-    //printf("Jugador: (%.1f, %.1f) base=%.1f\n", jugador->x, jugador->y, base_jugador);
+    printf("Jugador: (%.1f, %.1f) base=%.1f\n", jugador->x, jugador->y, base_jugador);
     
     // Convertir a matriz
     int fila_base, col_actual;
     coordenadas_a_matriz(jugador->x, base_jugador, &fila_base, &col_actual);
-    //printf("En matriz: [%d,%d]\n", fila_base, col_actual);
+    printf("En matriz: [%d,%d]\n", fila_base, col_actual);
     
     // Verificar fila debajo
     int fila_debajo = fila_base + 1;
-   // printf("Buscando plataformas en fila: %d\n", fila_debajo);
+    printf("Buscando plataformas en fila: %d\n", fila_debajo);
     
     if (fila_debajo >= MATRIZ_FILAS) {
-        //printf("ERROR: Fuera de matriz!\n");
+        printf("ERROR: Fuera de matriz!\n");
         return false;
     }
     
     // Verificar TODA la fila debajo
-    //printf("Fila %d completa: ", fila_debajo);
+    printf("Fila %d completa: ", fila_debajo);
     for (int c = 0; c < MATRIZ_COLUMNAS; c++) {
-       // printf("%d", matriz->celdas[fila_debajo][c].tipo);
+        printf("%d", matriz->celdas[fila_debajo][c].tipo);
     }
     printf("\n");
     
@@ -297,25 +326,25 @@ bool esta_en_superficie_matriz(Jugador *jugador, MatrizJuego *matriz) {
         if (col_check < 0 || col_check >= MATRIZ_COLUMNAS) continue;
         
         int tipo = matriz->celdas[fila_debajo][col_check].tipo;
-        //printf("Celda [%d,%d]: tipo=%d, solida=%d\n", fila_debajo, col_check, tipo, celda_es_solida(tipo));
+        printf("Celda [%d,%d]: tipo=%d, solida=%d\n", fila_debajo, col_check, tipo, celda_es_solida(tipo));
         
         if (celda_es_solida(tipo)) {
-            //printf("¡PLATAFORMA ENCONTRADA!\n");
+            printf("¡PLATAFORMA ENCONTRADA!\n");
             encontro_plataforma = true;
             
             float y_plataforma = fila_debajo * TAMANIO_CELDA;
             float distancia = base_jugador - y_plataforma;
-            //printf("Distancia a plataforma: %.1f\n", distancia);
+            printf("Distancia a plataforma: %.1f\n", distancia);
             
             if (distancia >= 0 && distancia < 15.0f) {
                 jugador->y = y_plataforma - JUGADOR_HITBOX/2 - 1;
-                //printf("AJUSTADO: y=%.1f\n", jugador->y);
+                printf("AJUSTADO: y=%.1f\n", jugador->y);
                 return true;
             }
         }
     }
     
-    //printf("RESULTADO: %s\n", encontro_plataforma ? "Plataforma lejana" : "NO HAY PLATAFORMA");
+    printf("RESULTADO: %s\n", encontro_plataforma ? "Plataforma lejana" : "NO HAY PLATAFORMA");
     return false;
 }
 
@@ -323,10 +352,10 @@ int liana_mas_cercana_matriz(Jugador *jugador, MatrizJuego *matriz) {
     int fila_actual, col_actual;
     coordenadas_a_matriz(jugador->x, jugador->y, &fila_actual, &col_actual);
     
-    //printf("Buscando lianas alrededor de: [%d,%d] pos=(%.1f,%.1f)\n", 
-           //fila_actual, col_actual, jugador->x, jugador->y);
+    printf("Buscando lianas alrededor de: [%d,%d] pos=(%.1f,%.1f)\n", 
+           fila_actual, col_actual, jugador->x, jugador->y);
     
-    // Buscar en un área MUY amplia
+    // Buscar en un area amplia alrededor del jugador
     for (int f_offset = -2; f_offset <= 2; f_offset++) {
         for (int col_offset = -3; col_offset <= 3; col_offset++) {
             int fila_check = fila_actual + f_offset;
@@ -338,26 +367,26 @@ int liana_mas_cercana_matriz(Jugador *jugador, MatrizJuego *matriz) {
             }
             
             if (matriz->celdas[fila_check][col_check].tipo == TIPO_LIANA) {
-                // Calcular posición exacta de la liana
+                // Calcular posicion exacta de la liana
                 float x_liana = col_check * TAMANIO_CELDA + TAMANIO_CELDA/2;
                 
                 float distancia_horizontal = fabs(jugador->x - x_liana);
                 
-                //printf("Liana en [%d,%d] - distH=%.1f (límite=%.1f)\n", 
-                       //fila_check, col_check, distancia_horizontal, DISTANCIA_AGARRE_LIANA);
+                printf("Liana en [%d,%d] - distH=%.1f (límite=%.1f)\n", 
+                       fila_check, col_check, distancia_horizontal, DISTANCIA_AGARRE_LIANA);
                 
-                // Permitir agarre MUY flexible - solo verificar horizontal
+                // Permitir agarre flexible - solo verificar horizontal
                 if (distancia_horizontal <= DISTANCIA_AGARRE_LIANA) {
-                    //printf("¡Liana SUFICIENTEMENTE CERCANA! Columna: %d\n", col_check);
+                    printf("¡Liana SUFICIENTEMENTE CERCANA! Columna: %d\n", col_check);
                     return col_check;
                 } else {
-                    //printf("Liana demasiado lejana\n");
+                    printf("Liana demasiado lejana\n");
                 }
             }
         }
     }
     
-    //printf("No se encontraron lianas en el área de búsqueda\n");
+    printf("No se encontraron lianas en el area de busqueda\n");
     return -1;
 }
 
@@ -365,16 +394,16 @@ bool esta_sobre_isla(Jugador *jugador, Isla islas[], int num_islas) {
     float base_jugador = jugador->y + JUGADOR_HITBOX/2;
     
     for (int i = 0; i < num_islas; i++) {
-        // Verificar si está horizontalmente sobre la isla
+        // Verifica si está horizontalmente sobre la isla
         bool sobre_isla_x = (jugador->x >= islas[i].x && 
                             jugador->x <= islas[i].x + islas[i].ancho);
         
-        // Verificar si está justo encima de la isla (con un margen)
+        // Verifica si está justo encima de la isla (con un margen)
         bool sobre_isla_y = (base_jugador >= islas[i].y - 5 && 
                             base_jugador <= islas[i].y + 5);
         
         if (sobre_isla_x && sobre_isla_y) {
-            //printf("DEBUG: ¡En isla %d! Ajustando posición...\n", i);
+            printf("DEBUG: ¡En isla %d! Ajustando posicion...\n", i);
             // Ajustar para estar exactamente sobre la isla
             jugador->y = islas[i].y - JUGADOR_HITBOX/2 - 1;
             return true;
@@ -383,7 +412,7 @@ bool esta_sobre_isla(Jugador *jugador, Isla islas[], int num_islas) {
     return false;
 }
 
-// Función auxiliar para calcular distancia (si no quieres usar raymath.h)
+// Funcion auxiliar para calcular distancia, pa evitar raymath.h
 float calcular_distancia(float x1, float y1, float x2, float y2) {
     float dx = x2 - x1;
     float dy = y2 - y1;
@@ -394,7 +423,7 @@ void verificar_colisiones_matriz(EstadoJuego *estado) {
     Jugador *j = &estado->jugador;
     MatrizJuego *matriz = &estado->matriz;
     
-    // Verificar área del jugador (no solo punto central)
+    // Verifica area del jugador, no solo punto central
     for (int f_offset = -1; f_offset <= 1; f_offset++) {
         for (int c_offset = -1; c_offset <= 1; c_offset++) {
             float check_x = j->x + (c_offset * (JUGADOR_HITBOX/3));
@@ -412,15 +441,15 @@ void verificar_colisiones_matriz(EstadoJuego *estado) {
             
             // Celda mortal
             if (celda_es_mortal(tipo_celda)) {
-                //printf("¡Colisión mortal! Tipo: %d en fila:%d,col:%d\n", 
-                       //tipo_celda, fila_check, col_check);
+                printf("¡Colisión mortal! Tipo: %d en fila:%d,col:%d\n", 
+                       tipo_celda, fila_check, col_check);
                 
                 estado->jugador.vidas--;
                 if (estado->jugador.vidas > 0) {
-                    //printf("¡Perdiste una vida! Vidas restantes: %d\n", estado->jugador.vidas);
+                    printf("¡Perdiste una vida! Vidas restantes: %d\n", estado->jugador.vidas);
                     // Respawn en isla segura
-                    j->x = estado->islas[1].x + estado->islas[1].ancho/2;
-                    j->y = estado->islas[1].y - 10;
+                    j->x = estado->islas[0].x + 50;
+                    j->y = estado->islas[0].y - JUGADOR_HITBOX;
                     j->velocidad_x = 0;
                     j->velocidad_y = 0;
                     j->estado = ESTADO_SUELO;
@@ -432,7 +461,7 @@ void verificar_colisiones_matriz(EstadoJuego *estado) {
                 return;
             }
             
-            // Fruta - solo si está suficientemente cerca
+            // Fruta - solo si esta suficientemente cerca
             if (tipo_celda == TIPO_FRUTA) {
                 // Buscar la fruta correspondiente
                 for (int i = 0; i < estado->num_frutas; i++) {
@@ -451,8 +480,8 @@ void verificar_colisiones_matriz(EstadoJuego *estado) {
                             j->puntuacion += estado->frutas[i].puntos;
                             estado->frutas[i].activo = false;
                             matriz->celdas[fila_check][col_check].tipo = TIPO_VACIO;
-                            //printf("¡Fruta tomada! +%d puntos. Total: %d\n", 
-                                   //estado->frutas[i].puntos, j->puntuacion);
+                            printf("¡Fruta tomada! +%d puntos. Total: %d\n", 
+                                   estado->frutas[i].puntos, j->puntuacion);
                         }
                         break;
                     }
@@ -468,7 +497,7 @@ void verificar_colisiones_matriz(EstadoJuego *estado) {
                 
                 if (distancia < (JUGADOR_HITBOX + 20) / 2) {
                     estado->juego_activo = false;
-                    //printf("¡Victoria! Rescataste a Donkey Kong. Puntuación final: %d\n", j->puntuacion);
+                    printf("¡Victoria! Rescataste a Donkey Kong. Puntuación final: %d\n", j->puntuacion);
                     return;
                 }
             }
@@ -476,52 +505,4 @@ void verificar_colisiones_matriz(EstadoJuego *estado) {
     }
 }
 
-// ==================== ACTUALIZACIÓN DESDE SERVIDOR ====================
-
-void actualizar_posicion_desde_matriz(EstadoJuego *estado) {
-    MatrizJuego *matriz = &estado->matriz;
-    
-    // Buscar al jugador en la matriz
-    for (int f = 0; f < MATRIZ_FILAS; f++) {
-        for (int c = 0; c < MATRIZ_COLUMNAS; c++) {
-            if (matriz->celdas[f][c].tipo == TIPO_JUGADOR) {
-                // Convertir coordenadas de matriz a píxeles
-                float x = c * TAMANIO_CELDA + TAMANIO_CELDA / 2;
-                float y = f * TAMANIO_CELDA + TAMANIO_CELDA / 2;
-                
-                // Actualizar posición del jugador
-                estado->jugador.x = x;
-                estado->jugador.y = y;
-                
-                printf("Posición actualizada desde matriz: [%d][%d] -> (%.1f, %.1f)\n", 
-                       f, c, x, y);
-                return;
-            }
-        }
-    }
-    
-    printf("ADVERTENCIA: Jugador no encontrado en matriz\n");
-}
-
-// ==================== FUNCIONES OBSOLETAS (ELIMINAR) ====================
-
-// ESTAS FUNCIONES YA NO SE USAN - SE MANTIENEN TEMPORALMENTE PARA COMPILACIÓN
-bool esta_en_superficie(Jugador *jugador, EstadoJuego *estado) {
-    return esta_en_superficie_matriz(jugador, &estado->matriz);
-}
-
-int liana_mas_cercana(Jugador *jugador, Liana lianas[], int num_lianas) {
-    return liana_mas_cercana_matriz(jugador, &((EstadoJuego*)0)->matriz); // Placeholder
-}
-
-bool esta_en_isla(Jugador *jugador, Isla islas[], int num_islas) {
-    return false; // Obsoleta
-}
-
-int encontrar_isla_para_respawn(Isla islas[], int num_islas) {
-    return 0; // Obsoleta
-}
-
-void verificar_colisiones(EstadoJuego *estado) {
-    verificar_colisiones_matriz(estado); // Redirigir a nueva función
-}
+// ==================== FIN SISTEMA DE MATRIZ ====================

@@ -93,27 +93,21 @@ public class ClientHandler implements Runnable {
                     System.out.println("📥 Recibiendo estado del cliente...");
                     
                     // 1. Recibir ESTADO ACTUAL del cliente
-                    float clientX = Float.intBitsToFloat(adapter.receiveInt());
-                    float clientY = Float.intBitsToFloat(adapter.receiveInt());
+                    int matrizX = adapter.receiveInt();
+                    int matrizY = adapter.receiveInt();
                     int vidasCliente = adapter.receiveInt();
                     int puntosCliente = adapter.receiveInt();
                     
-                    System.out.println("Estado recibido del cliente:");
-                    System.out.println("   - Posición: (" + clientX + ", " + clientY + ")");
-                    System.out.println("   - Vidas: " + vidasCliente);
-                    System.out.println("   - Puntos: " + puntosCliente);
-                    
-                    // 2. CONVERTIR a coordenadas de matriz
-                    int matrizX = (int)(clientX / 40);
-                    int matrizY = (int)(clientY / 40);
-                    
-                    System.out.println("Convertido a matriz: [" + matrizX + "," + matrizY + "]");
-                    
+                    System.out.println("📍 Estado recibido (MATRIZ): [" + matrizX + "," + matrizY + "] Vidas:" + vidasCliente + " Puntos:" + puntosCliente);
+                
                     // DEBUG ANTES de GameLogic
                     System.out.println("ANTES de GameLogic:");
                     System.out.println("   - Vidas actuales: " + vidas);
                     System.out.println("   - Puntos actuales: " + puntos);
                     System.out.println("   - Juego activo: " + juegoActivo);
+                    
+                    // 2. ACTUALIZAR GameLogic con coordenadas de matriz directamente
+                    System.out.println("🎯 GameLogic - Actualizando jugador a: (" + matrizX + ", " + matrizY + ")");
                     
                     // 3. ACTUALIZAR GameLogic
                     gameLogic.updatePlayerFromClient(matrizX, matrizY);

@@ -82,24 +82,23 @@ bool conectar_servidor(const char* ip) {
 }
 
 
-bool enviar_estado_actual_al_servidor(float x, float y, int vidas, int puntos) {
+bool enviar_estado_actual_al_servidor(int matriz_x, int matriz_y, int vidas, int puntuacion) {
     if (!servidor_conectado) return false;
-
-    printf("📤 Enviando estado actual al servidor...\n");
     
-    // ✅ Enviar POSICIÓN + ESTADO actual (no controles)
-    adapter_send_int(socket_servidor, *(int*)&x);
-    adapter_send_int(socket_servidor, *(int*)&y);
+    printf("📤 Enviando estado MATRIZ: [%d,%d] Vidas:%d Puntos:%d\n", 
+           matriz_x, matriz_y, vidas, puntuacion);
+    
+    // Enviar coordenadas de matriz en lugar de coordenadas del mundo
+    adapter_send_int(socket_servidor, matriz_x);
+    adapter_send_int(socket_servidor, matriz_y);
     adapter_send_int(socket_servidor, vidas);
-    adapter_send_int(socket_servidor, puntos);
+    adapter_send_int(socket_servidor, puntuacion);
     
-    printf("📤 Estado enviado - Pos:(%.1f,%.1f) Vidas:%d Puntos:%d\n", 
-           x, y, vidas, puntos);
     return true;
 }
 
 
-bool recibir_consecuencias_del_servidor(int *vidas, int *puntos, bool *activo) {
+bool recibir_consecuencias_del_servidor(int *vidas, int *puntuacion, bool *juego_activo) {
     if (!servidor_conectado) return false;
 
     printf("🔄 Esperando consecuencias del servidor...\n");
@@ -119,11 +118,11 @@ bool recibir_consecuencias_del_servidor(int *vidas, int *puntos, bool *activo) {
     
     if (resultado1 > 0 && resultado2 > 0 && resultado3 > 0) {
         *vidas = temp_vidas;
-        *puntos = temp_puntos;
-        *activo = (temp_activo != 0);
+        *puntuacion = temp_puntos;
+        *juego_activo = (temp_activo != 0);
         
         printf("✅ Consecuencias aplicadas - Vidas:%d Puntos:%d Activo:%d\n", 
-               *vidas, *puntos, *activo);
+               *vidas, *puntuacion, *juego_activo);
         
         return true;
     }

@@ -10,7 +10,7 @@ typedef struct {
 void actualizar_controles(Controles *ctrl);
 void aplicar_movimiento(EstadoJuego *estado, Controles *ctrl);
 
-// NUEVAS FUNCIONES MODULARES
+//FUNCIONES MODULARES PARA MANEJO DE ESTADOS
 void manejar_estado_suelo(EstadoJuego *estado, Controles *ctrl);
 void manejar_estado_aereo(EstadoJuego *estado, Controles *ctrl);
 void manejar_estado_liana(EstadoJuego *estado, Controles *ctrl);
@@ -18,7 +18,7 @@ void aplicar_fisica_jugador(Jugador *jugador);
 void limitar_movimiento_jugador(Jugador *jugador);
 void verificar_aterrizaje(Jugador *j, EstadoJuego *estado);
 
-// Funciones específicas
+// Funciones especificas
 void aplicar_gravedad(Jugador *j);
 void procesar_movimiento_horizontal_suelo(Jugador *j, Controles *ctrl);
 void procesar_movimiento_horizontal_aereo(Jugador *j, Controles *ctrl);

@@ -74,15 +74,15 @@ public class GameLogic {
     public void updatePlayerFromClient(int newX, int newY) {
         // Validación de límites
         if (newX < 0) newX = 0;
-        if (newX >= 20) newX = 19;
+        if (newX >= 30) newX = 29;
         if (newY < 0) newY = 0;
-        if (newY >= 15) newY = 14;
+        if (newY >= 40) newY = 39;
         
         System.out.println("GameLogic - Actualizando jugador a: (" + newX + ", " + newY + ")");
         
         // ✅ DEBUG: Verificar abismo ANTES de procesar
-        boolean esAbismo = GameConfig.isAbyss(newY);
-        System.out.println("🔍 DEBUG Abismo check: y=" + newY + " -> " + esAbismo);
+        boolean esAbismo = GameConfig.isAbyss(newX);
+        System.out.println("🔍 DEBUG Abismo check: y=" + newX + " -> " + esAbismo);
         
         if (esAbismo) {
             System.out.println("JUGADOR CAYÓ AL ABISMO - Activando handlePlayerFall");
@@ -151,7 +151,7 @@ public class GameLogic {
 
     private void respawnPlayer() {
         // Ajusta a la posición inicial de tu mapa
-        player.setPosition(10, 5);
+        player.setPosition(2, 26);
         player.setOnVine(false);
     }
 

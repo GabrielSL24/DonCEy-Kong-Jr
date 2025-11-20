@@ -7,7 +7,7 @@
             "command": "gcc",
             "args": [
                 "-o", "game.exe",
-                "main.c", "game.c", "graficos.c", "controles.c", "conexion.c",
+                "main.c", "game.c", "graficos.c", "controles.c", "conexion.c", "mapa.c",
                 "-I", "C:/raylib/raylib/src",
                 "-L", "C:/raylib/raylib/src", 
                 "-lraylib",

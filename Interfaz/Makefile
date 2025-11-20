@@ -11,7 +11,7 @@ LDFLAGS = -L"$(RAYLIB_PATH)/src"
 LDLIBS = -lraylib -lopengl32 -lgdi32 -lwinmm
 
 # Archivos fuente
-SRC = main.c game.c graficos.c controles.c conexion.c
+SRC = main.c game.c graficos.c controles.c conexion.c  mapa.c
 OBJ = $(SRC:.c=.o)
 
 # Target principal

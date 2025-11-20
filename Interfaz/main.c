@@ -1,71 +1,75 @@
-#include "C:/raylib/raylib/src/raylib.h"
-
-#include <stdio.h>
-#include <stdbool.h>
-//#include "raylib.h" 
-
-#include "game.h"
-#include "config.h"
 #include "graficos.h"
+#include "mapa.h"
 #include "controles.h"
+#include "game.h"
 #include "conexion.h"
+#include <stdio.h>
 
 int main(void) {
     EstadoJuego estado;
-    Controles controles = {0};
+    Controles ctrl = {0};
     
+    // Inicialización gráfica y del juego
     inicializar_graficos();
+    cargar_mapa(&mapa_global);
     inicializar_juego(&estado);
+    configurar_mapa_completo(&mapa_global, &estado);
     
-    // ✅ DEBUG: Estado inicial del juego
+    // DEBUG: Estado inicial
     printf("🎮 Estado INICIAL del juego:\n");
     printf("   - Posición: (%.1f, %.1f)\n", estado.jugador.x, estado.jugador.y);
     printf("   - Vidas: %d\n", estado.jugador.vidas);
     printf("   - Puntos: %d\n", estado.jugador.puntuacion);
     printf("   - Juego activo: %s\n", estado.juego_activo ? "SÍ" : "NO");
     
+    // Conexión al servidor
     if(!conectar_servidor("127.0.0.1")) {
         printf("Modo local activado.\n");
     } else {
         printf("✅ Conectado al servidor\n");
     }
     
+    // Bucle principal del juego
     while (!WindowShouldClose()) {
-        actualizar_controles(&controles);
+        actualizar_controles(&ctrl);
         
         if (servidor_conectado && estado.juego_activo) {
-            // 1. MOVIMIENTO LOCAL
-            aplicar_movimiento(&estado, &controles);
+            // MODO CON SERVIDOR
+            aplicar_movimiento(&estado, &ctrl);
             verificar_colisiones_matriz(&estado);
             actualizar_matriz_desde_estado(&estado);
             
-            // 2. SINCRONIZAR con servidor
+            // Sincronizar con servidor cada ciertos frames
             static int frame_count = 0;
-            if (frame_count % 2 == 0) {
+            if (frame_count % 10 == 0) { // Cada 2 frames
                 printf("🔄 Frame %d - Sincronizando con servidor...\n", frame_count);
-                printf("   - Estado actual: vidas=%d, puntos=%d\n", 
-                       estado.jugador.vidas, estado.jugador.puntuacion);
                 
-                // Enviar estado actual
-                if (enviar_estado_actual_al_servidor(estado.jugador.x, estado.jugador.y,
-                                                    estado.jugador.vidas, estado.jugador.puntuacion)) {
+                // Convertir coordenadas a matriz antes de enviar
+                int matriz_x, matriz_y;
+                coordenadas_a_matriz(estado.jugador.x, estado.jugador.y, &matriz_x, &matriz_y);
+
+                printf("📍 Enviando coordenadas MATRIZ: [%d, %d]\n", matriz_x, matriz_y);
+
+                if (enviar_estado_actual_al_servidor(matriz_x, matriz_y, estado.jugador.vidas, estado.jugador.puntuacion)) {
                     printf("📤 Estado enviado al servidor\n");
-                    
-                    // Recibir consecuencias
+
+                    //Recibir consecuencias
                     int vidas_serv, puntos_serv;
                     bool activo_serv;
+
                     if (recibir_consecuencias_del_servidor(&vidas_serv, &puntos_serv, &activo_serv)) {
                         printf("📥 Consecuencias recibidas del servidor\n");
-                        
-                        // Aplicar consecuencias
+
+                        //Aplcar consecuencias
                         estado.jugador.vidas = vidas_serv;
                         estado.jugador.puntuacion = puntos_serv;
                         estado.juego_activo = activo_serv;
-                        
+
                         printf("🔄 Estado actualizado:\n");
-                        printf("   - Vidas: %d → %d\n", estado.jugador.vidas, vidas_serv);
-                        printf("   - Puntos: %d → %d\n", estado.jugador.puntuacion, puntos_serv);
+                        printf("   - Vidas: %d\n", estado.jugador.vidas);
+                        printf("   - Puntos: %d\n", estado.jugador.puntuacion);
                         printf("   - Activo: %s\n", estado.juego_activo ? "SÍ" : "NO");
+
                     } else {
                         printf("❌ No se pudieron recibir consecuencias\n");
                     }
@@ -76,14 +80,16 @@ int main(void) {
             frame_count++;
             
         } else if (!servidor_conectado) {
-            // MODO LOCAL
-            aplicar_movimiento(&estado, &controles);
+            // MODO LOCAL (sin servidor)
+            aplicar_movimiento(&estado, &ctrl);
             verificar_colisiones_matriz(&estado);
             actualizar_matriz_desde_estado(&estado);
         }
         
-        dibujar_escena(&estado);
+        // Dibujar escena completa con sprites
+        dibujar_escena_completa(&estado, &mapa_global, &sprites_global);
         
+        // Pantalla de juego terminado
         if (!estado.juego_activo) {
             printf("💀 JUEGO TERMINADO - Mostrando pantalla final\n");
             BeginDrawing();
@@ -94,10 +100,12 @@ int main(void) {
         }
     }
     
+    // Limpieza
     if (servidor_conectado) {
         desconectar_servidor();
     }
-
+    descargar_mapa(&mapa_global);
     cerrar_graficos();
+    
     return 0;
 }
