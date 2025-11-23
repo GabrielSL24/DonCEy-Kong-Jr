@@ -74,9 +74,9 @@ public class GameLogic {
     public void updatePlayerFromClient(int newX, int newY) {
         // Validación de límites
         if (newX < 0) newX = 0;
-        if (newX >= 30) newX = 29;
+        if (newX >= 40) newX = 39;
         if (newY < 0) newY = 0;
-        if (newY >= 40) newY = 39;
+        if (newY >= 30) newY = 29;
         
         System.out.println("GameLogic - Actualizando jugador a: (" + newX + ", " + newY + ")");
         

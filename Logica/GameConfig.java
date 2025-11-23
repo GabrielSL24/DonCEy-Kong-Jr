@@ -31,7 +31,7 @@ public class GameConfig {
     // Ejemplo: abismo si y es mayor a cierto límite
     public static boolean isAbyss(int y) {
         // Abismo en las últimas filas (agua)
-        boolean esAbismo = (y >= 26);
+        boolean esAbismo = (y >= 28);
         System.out.println("🌊 GameConfig.isAbyss(" + y + ") = " + esAbismo);
         return esAbismo;
     }
