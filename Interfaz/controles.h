@@ -1,30 +1,35 @@
 #ifndef CONTROLES_H
 #define CONTROLES_H
 
-#include "game.h"
+#include <stdbool.h>
 
+#define MAX_INPUTS_PER_FRAME 10
+
+// Estructura para inputs por frame (DEFINIDA UNA SOLA VEZ)
+typedef struct {
+    char inputs[MAX_INPUTS_PER_FRAME][20]; // "LEFT_PRESSED", "RIGHT_RELEASED", etc.
+    int num_inputs;
+} FrameInputs;
+
+// Estructura simplificada alternativa
 typedef struct {
     bool izquierda, derecha, arriba, abajo, espacio;
 } Controles;
 
+// ==================== FUNCIONES PRINCIPALES ====================
+void detectar_inputs_frame(FrameInputs *frame_inputs);
 void actualizar_controles(Controles *ctrl);
-void aplicar_movimiento(EstadoJuego *estado, Controles *ctrl);
 
-//FUNCIONES MODULARES PARA MANEJO DE ESTADOS
-void manejar_estado_suelo(EstadoJuego *estado, Controles *ctrl);
-void manejar_estado_aereo(EstadoJuego *estado, Controles *ctrl);
-void manejar_estado_liana(EstadoJuego *estado, Controles *ctrl);
-void aplicar_fisica_jugador(Jugador *jugador);
-void limitar_movimiento_jugador(Jugador *jugador);
-void verificar_aterrizaje(Jugador *j, EstadoJuego *estado);
+// ==================== FUNCIONES DE CONVERSIÓN ====================
+bool hay_inputs_nuevos(const Controles *ctrl);
+const char* obtener_input_presionado(const Controles *ctrl);
+void limpiar_controles(Controles *ctrl);
 
-// Funciones especificas
-void aplicar_gravedad(Jugador *j);
-void procesar_movimiento_horizontal_suelo(Jugador *j, Controles *ctrl);
-void procesar_movimiento_horizontal_aereo(Jugador *j, Controles *ctrl);
-void iniciar_salto(Jugador *j, Controles *ctrl);
-bool intentar_agarrar_liana(Jugador *j, EstadoJuego *estado);
-void saltar_desde_liana(Jugador *j, Controles *ctrl);
-bool cambiar_liana(Jugador *j, EstadoJuego *estado, float direccion);
+// ==================== FUNCIONES DE CONSULTA DIRECTA ====================
+bool tecla_izquierda_presionada(void);
+bool tecla_derecha_presionada(void);
+bool tecla_arriba_presionada(void);
+bool tecla_abajo_presionada(void);
+bool tecla_espacio_presionada(void);
 
 #endif

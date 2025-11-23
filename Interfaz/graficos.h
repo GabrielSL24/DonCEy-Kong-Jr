@@ -3,7 +3,6 @@
 
 #include "raylib.h"
 #include "game.h"
-#include "mapa.h"
 
 // Sistema de sprites
 typedef struct {
@@ -17,26 +16,40 @@ typedef struct {
     Sprite padre;
     Sprite cocodrilo_rojo;
     Sprite cocodrilo_azul;
-    Sprite fruta_naranja;
-    Sprite fruta_roja;
-    Sprite fruta_celeste;
-    Sprite fruta_banano;
+    Sprite fruta_banana;
+    Sprite fruta_apple;
+    Sprite fruta_pear;
+    Sprite fruta_orange;
 } SistemaSprites;
 
 // Declarar la variable global
 extern SistemaSprites sprites_global;
 
-// Funciones de dibujo
+// ==================== FUNCIONES DE INICIALIZACIÓN ====================
 void inicializar_graficos(void);
 void cerrar_graficos(void);
 void cargar_sprites(SistemaSprites *sprites);
 void descargar_sprites(SistemaSprites *sprites);
-void dibujar_escena_completa(EstadoJuego *estado, Mapa *mapa, SistemaSprites *sprites);
-void dibujar_jugador_con_sprite(Jugador *j, SistemaSprites *sprites);
-void dibujar_padre_con_sprite(Padre *p, SistemaSprites *sprites);
-void dibujar_cocodrilo_con_sprite(Cocodrilo *c, SistemaSprites *sprites);
-void dibujar_fruta_con_sprite(Fruta *f, SistemaSprites *sprites);
-void dibujar_ui(EstadoJuego *estado);
-void dibujar_escena(EstadoJuego *estado);
+
+// ==================== FUNCIONES DE MAPA/FONDO ====================
+void cargar_fondo(SistemaSprites *sprites);
+void descargar_fondo(SistemaSprites *sprites);
+void dibujar_fondo(const SistemaSprites *sprites);
+
+// ==================== FUNCIONES DE RENDERIZADO ====================
+void dibujar_escena_completa(const EstadoJuego *estado, const SistemaSprites *sprites);
+void dibujar_ui(const EstadoJuego *estado);
+
+// ==================== FUNCIONES DE DIBUJO DE ENTIDADES ====================
+void dibujar_jugador(const Jugador *jugador, const SistemaSprites *sprites);
+void dibujar_padre(const Padre *padre, const SistemaSprites *sprites);
+void dibujar_cocodrilo(const Cocodrilo *cocodrilo, const SistemaSprites *sprites);
+void dibujar_fruta(const Fruta *fruta, const SistemaSprites *sprites);
+void dibujar_lianas(const Liana lianas[], int num_lianas);
+void dibujar_plataformas(const Plataforma plataformas[], int num_plataformas);
+
+// ==================== FUNCIONES DE DEBUG ====================
+void dibujar_debug_info(const EstadoJuego *estado);
+void dibujar_hitboxes(const EstadoJuego *estado);
 
 #endif

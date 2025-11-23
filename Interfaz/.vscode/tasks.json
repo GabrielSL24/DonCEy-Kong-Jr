@@ -7,15 +7,17 @@
             "command": "gcc",
             "args": [
                 "-o", "game.exe",
-                "main.c", "game.c", "graficos.c", "controles.c", "conexion.c", "mapa.c",
+                "main.c", "game.c", "graficos.c", "controles.c", "conexion.c",
+                "../server/AdapterC.c",  
                 "-I", "C:/raylib/raylib/src",
-                "-L", "C:/raylib/raylib/src", 
+                "-I", "../server",       
+                "-L", "C:/raylib/raylib/src",
                 "-lraylib",
-                "-lopengl32",
-                "-lgdi32", 
+                "-lgdi32",
                 "-lwinmm",
+                "-lws2_32",             
                 "-DPLATFORM_DESKTOP",
-                "-Wall", 
+                "-Wall",
                 "-std=c99"
             ],
             "group": {

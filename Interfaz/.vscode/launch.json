@@ -5,7 +5,7 @@
       "name": "Debug Game",
       "type": "cppdbg",
       "request": "launch",
-      "program": "${workspaceFolder}/game.exe",
+      "program": "${workspaceFolder}/cliente.exe",
       "args": [],
       "stopAtEntry": false,
       "cwd": "${workspaceFolder}",
@@ -23,27 +23,14 @@
       "preLaunchTask": "build"
     },
     {
-      "name": "Run Game",
-      "type": "cppdbg",
-      "request": "launch",
-      "program": "${workspaceFolder}/game.exe",
-      "args": [],
-      "stopAtEntry": false,
-      "cwd": "${workspaceFolder}",
-      "environment": [],
-      "externalConsole": false,
-      "MIMode": "gdb",
-      "miDebuggerPath": "C:/Core/Programacion/mingw64/bin/gdb.exe"
-    },
-    {
       "name": "C/C++ Runner: Debug Session",
       "type": "cppdbg",
       "request": "launch",
       "args": [],
       "stopAtEntry": false,
       "externalConsole": true,
-      "cwd": "c:/Users/saddy/OneDrive/Escritorio/Nueva carpeta",
-      "program": "c:/Users/saddy/OneDrive/Escritorio/Nueva carpeta/build/Debug/outDebug",
+      "cwd": "c:/Repos/DonCEy-Kong-Jr/Interfaz",
+      "program": "c:/Repos/DonCEy-Kong-Jr/Interfaz/build/Debug/outDebug",
       "MIMode": "gdb",
       "miDebuggerPath": "gdb",
       "setupCommands": [

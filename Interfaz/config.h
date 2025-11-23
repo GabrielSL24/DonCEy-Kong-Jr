@@ -85,11 +85,6 @@
 #define SPRITE_COCODRILO_SIZE 28   // Cocodrilos
 #define SPRITE_FRUTA_SIZE 20       // Frutas
 
-#define DEBUG_COLISIONES true
-#define COLOR_SUELO_DEBUG (Color){0, 255, 0, 100}
-#define COLOR_LIANA_DEBUG (Color){255, 255, 0, 100}
-#define COLOR_MORTAL_DEBUG (Color){255, 0, 0, 100}
-#define COLOR_PLATAFORMA_DEBUG (Color){0, 0, 255, 100}
 // Debug
 #define DEBUG_COLISIONES true
 #define COLOR_SUELO_DEBUG (Color){0, 255, 0, 100}

@@ -2,32 +2,38 @@
 #define CONEXION_H
 
 #include "game.h"
-#include <stdint.h>
-#include "config.h"
-#include "controles.h"
+#include "types.h"
+#include <stdbool.h>
+#include <stddef.h>
 
-// Estructura para enviar inputs al servidor
+// Estructura para paquete JSON
 typedef struct {
-    bool izquierda, derecha, arriba, abajo, espacio;
-    int jugador_id;
-    uint32_t timestamp;
-} PaqueteInput;
+    char* json_data;
+    size_t json_size;
+} PaqueteJSON;
 
-// Estructura para recibir estado del servidor  
-typedef struct {
-    int matriz[MATRIZ_FILAS][MATRIZ_COLUMNAS];
-    int vidas;
-    int puntuacion;
-    bool juego_activo;
-} PaqueteEstado;
-
+// ==================== FUNCIONES DE CONEXIÓN ====================
 bool conectar_servidor(const char* ip);
-bool enviar_estado_actual_al_servidor(int matriz_x, int matriz_y, int vidas, int puntuacion);
-bool recibir_consecuencias_del_servidor(int *vidas, int *puntuacion, bool *juego_activo);
 void desconectar_servidor(void);
 
-// Función temporal para simular servidor
-//void simular_servidor_local(EstadoJuego *estado, Controles *ctrl);
+// ==================== FUNCIONES DE COMUNICACIÓN JSON ====================
+bool enviar_input_al_servidor(TipoCliente client_type, int player_id, const char* game_id, 
+                             const char* input_type, const char* key);
+bool recibir_estado_actualizado(EstadoJuego *estado);
 
+// ==================== FUNCIONES DE SERIALIZACIÓN/DESERIALIZACIÓN ====================
+bool serializar_input_a_json(TipoCliente client_type, int player_id, const char* game_id,
+                            const char* input_type, const char* key, PaqueteJSON *paquete);
+bool deserializar_json_a_estado(const char *json_data, EstadoJuego *estado);
+
+// ==================== FUNCIONES UTILITARIAS JSON ====================
+const char* estado_jugador_a_string(EstadoPlayerJSON estado);
+EstadoPlayerJSON estado_jugador_desde_string(const char* estado_str);
+const char* tipo_enemigo_a_string(TipoEnemigo tipo);
+const char* tipo_fruta_a_string(TipoFruta tipo);
+void liberar_paquete_json(PaqueteJSON *paquete);
+
+// ==================== VARIABLE GLOBAL ====================
 extern bool servidor_conectado;
+
 #endif

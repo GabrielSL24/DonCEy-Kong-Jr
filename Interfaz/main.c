@@ -1,5 +1,4 @@
 #include "graficos.h"
-#include "mapa.h"
 #include "controles.h"
 #include "game.h"
 #include "conexion.h"
@@ -7,96 +6,78 @@
 
 int main(void) {
     EstadoJuego estado;
-    Controles ctrl = {0};
+    FrameInputs inputs_frame;
     
-    // Inicialización gráfica y del juego
+    // Inicialización
     inicializar_graficos();
-    cargar_mapa(&mapa_global);
-    inicializar_juego(&estado);
-    configurar_mapa_completo(&mapa_global, &estado);
+    inicializar_estado_juego(&estado);
     
-    // DEBUG: Estado inicial
-    printf("🎮 Estado INICIAL del juego:\n");
-    printf("   - Posición: (%.1f, %.1f)\n", estado.jugador.x, estado.jugador.y);
-    printf("   - Vidas: %d\n", estado.jugador.vidas);
-    printf("   - Puntos: %d\n", estado.jugador.puntuacion);
-    printf("   - Juego activo: %s\n", estado.juego_activo ? "SÍ" : "NO");
+    printf("🎮 Cliente Donkey Kong Jr Iniciado\n");
+    printf("   - Pantalla: %dx%d\n", SCREEN_WIDTH, SCREEN_HEIGHT);
+    printf("   - FPS: %d\n", FPS);
     
     // Conexión al servidor
     if(!conectar_servidor("127.0.0.1")) {
-        printf("Modo local activado.\n");
+        printf("🔌 Modo local activado (sin servidor)\n");
     } else {
         printf("✅ Conectado al servidor\n");
     }
     
     // Bucle principal del juego
     while (!WindowShouldClose()) {
-        actualizar_controles(&ctrl);
+        // 1. DETECTAR INPUTS
+        detectar_inputs_frame(&inputs_frame);
         
-        if (servidor_conectado && estado.juego_activo) {
-            // MODO CON SERVIDOR
-            aplicar_movimiento(&estado, &ctrl);
-            verificar_colisiones_matriz(&estado);
-            actualizar_matriz_desde_estado(&estado);
-            
-            // Sincronizar con servidor cada ciertos frames
-            static int frame_count = 0;
-            if (frame_count % 10 == 0) { // Cada 2 frames
-                printf("🔄 Frame %d - Sincronizando con servidor...\n", frame_count);
-                
-                // Convertir coordenadas a matriz antes de enviar
-                int matriz_x, matriz_y;
-                coordenadas_a_matriz(estado.jugador.x, estado.jugador.y, &matriz_x, &matriz_y);
-
-                printf("📍 Enviando coordenadas MATRIZ: [%d, %d]\n", matriz_x, matriz_y);
-
-                if (enviar_estado_actual_al_servidor(matriz_x, matriz_y, estado.jugador.vidas, estado.jugador.puntuacion)) {
-                    printf("📤 Estado enviado al servidor\n");
-
-                    //Recibir consecuencias
-                    int vidas_serv, puntos_serv;
-                    bool activo_serv;
-
-                    if (recibir_consecuencias_del_servidor(&vidas_serv, &puntos_serv, &activo_serv)) {
-                        printf("📥 Consecuencias recibidas del servidor\n");
-
-                        //Aplcar consecuencias
-                        estado.jugador.vidas = vidas_serv;
-                        estado.jugador.puntuacion = puntos_serv;
-                        estado.juego_activo = activo_serv;
-
-                        printf("🔄 Estado actualizado:\n");
-                        printf("   - Vidas: %d\n", estado.jugador.vidas);
-                        printf("   - Puntos: %d\n", estado.jugador.puntuacion);
-                        printf("   - Activo: %s\n", estado.juego_activo ? "SÍ" : "NO");
-
-                    } else {
-                        printf("❌ No se pudieron recibir consecuencias\n");
-                    }
-                } else {
-                    printf("❌ No se pudo enviar estado al servidor\n");
-                }
+        // 2. ENVIAR INPUTS AL SERVIDOR
+        if (servidor_conectado) {
+            for (int i = 0; i < inputs_frame.num_inputs; i++) {
+                enviar_input_al_servidor(
+                    CLIENT_PLAYER, 
+                    1, 
+                    "partida_default",
+                    "KEY_PRESSED", 
+                    inputs_frame.inputs[i]
+                );
             }
-            frame_count++;
-            
-        } else if (!servidor_conectado) {
-            // MODO LOCAL (sin servidor)
-            aplicar_movimiento(&estado, &ctrl);
-            verificar_colisiones_matriz(&estado);
-            actualizar_matriz_desde_estado(&estado);
+        } else {
+            // MODO LOCAL: Mostrar inputs detectados (debug)
+            if (inputs_frame.num_inputs > 0) {
+                printf("🔧 Modo local - Inputs ignorados: ");
+                for (int i = 0; i < inputs_frame.num_inputs; i++) {
+                    printf("%s ", inputs_frame.inputs[i]);
+                }
+                printf("\n");
+            }
         }
         
-        // Dibujar escena completa con sprites
-        dibujar_escena_completa(&estado, &mapa_global, &sprites_global);
+        // 3. RECIBIR ESTADO ACTUALIZADO DEL SERVIDOR
+        if (servidor_conectado) {
+            if (recibir_estado_actualizado(&estado)) {
+                printf("📥 Estado recibido del servidor - Pos: (%.1f, %.1f)\n", 
+                       estado.jugador.x, estado.jugador.y);
+            }
+        } else {
+            // MODO LOCAL: Simular estado estático (solo para prueba)
+            static bool mostrado = false;
+            if (!mostrado) {
+                printf("🔧 Ejecutando en modo local - Esperando servidor...\n");
+                mostrado = true;
+            }
+        }
         
-        // Pantalla de juego terminado
-        if (!estado.juego_activo) {
-            printf("💀 JUEGO TERMINADO - Mostrando pantalla final\n");
-            BeginDrawing();
-            ClearBackground(BLACK);
-            DrawText("JUEGO TERMINADO", 100, 200, 40, RED);
-            DrawText("Presiona ESC para salir", 120, 250, 20, WHITE);
-            EndDrawing();
+        // 4. RENDERIZAR ESCENA
+        dibujar_escena_completa(&estado, &sprites_global);
+        
+        // 5. MANEJAR ESTADO DEL JUEGO
+        if (!estado.juego_activo && servidor_conectado) {
+            // Juego terminado por el servidor
+            printf("💀 JUEGO TERMINADO - Esperando reinicio...\n");
+            
+            // Podrías agregar lógica para reiniciar o salir
+            if (IsKeyPressed(KEY_ENTER)) {
+                printf("🔄 Solicitando reinicio al servidor...\n");
+                // enviar_input_al_servidor(CLIENT_PLAYER, 1, "partida_default", "RESTART", "");
+            }
         }
     }
     
@@ -104,8 +85,8 @@ int main(void) {
     if (servidor_conectado) {
         desconectar_servidor();
     }
-    descargar_mapa(&mapa_global);
     cerrar_graficos();
     
+    printf("👋 Cliente cerrado correctamente\n");
     return 0;
 }
