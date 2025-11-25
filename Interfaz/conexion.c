@@ -255,11 +255,46 @@ static bool extraer_bool_json(const char *json, const char *clave) {
     char patron[100];
     snprintf(patron, sizeof(patron), "\"%s\":", clave);
     
+    printf("Buscando clave '%s' con patrón: '%s'\n", clave, patron);
+
     const char *inicio = strstr(json, patron);
-    if (!inicio) return false;
+    if (!inicio) {
+        printf("❌ Clave '%s' no encontrada en JSON\n", clave);
+        // Vamos a mostrar el JSON completo para debug
+        printf("📄 JSON completo (primeros 500 chars):\n%.500s\n", json);
+        return false;
+    }
     
     inicio += strlen(patron);
-    return (strncmp(inicio, "true", 4) == 0);
+     printf("✅ Clave '%s' encontrada, valor empieza en: '%.50s'\n", clave, inicio);
+    
+    //Buscar "true" o "false"
+    if (strncmp(inicio, "true", 4) == 0) {
+        printf(" %s: true\n", clave);
+        return true;
+    } else if (strncmp(inicio, "false", 5) == 0) {
+        printf(" %s: false\n", clave);
+        return false;
+    }
+
+    //Si no encuentra true/false, buscar como numero(0 o 1)
+    if (strncmp(inicio, "1", 1) == 0) {
+        printf(" %s: true\n", clave);
+        return true;
+    } else if (strncmp(inicio, "0", 1) == 0) {
+        printf(" %s: false\n", clave);
+        return false;
+    }
+    
+    // Mostrar exactamente qué hay después de la clave
+    printf("❌ Valor no reconocido para '%s'. Contenido: '", clave);
+    for (int i = 0; i < 20 && inicio[i] != '\0' && inicio[i] != ',' && inicio[i] != '}'; i++) {
+        printf("%c", inicio[i]);
+    }
+    printf("'\n");
+
+
+    return false;
 }
 
 // ==================== DESERIALIZACIÓN JSON COMPLETA ====================
@@ -271,6 +306,9 @@ bool deserializar_json_a_estado(const char *json_data, EstadoJuego *estado) {
         printf("❌ JSON vacío o nulo\n");
         return false;
     }
+
+    printf("📄 JSON COMPLETO RECIBIDO:\n%s\n", json_data);
+    printf("📏 Longitud del JSON: %zu caracteres\n", strlen(json_data));
     
     // 1. GAME ID y TIMESTAMP (información general)
     char* game_id = extraer_string_json(json_data, "game_id");
@@ -304,7 +342,8 @@ bool deserializar_json_a_estado(const char *json_data, EstadoJuego *estado) {
     
     printf("✅ JSON deserializado - Jugador: (%.1f, %.1f), Vidas: %d, Puntos: %d, Estado: %d\n",
            estado->jugador.x, estado->jugador.y, estado->jugador.vidas, 
-           estado->jugador.puntuacion, estado->jugador.estado);
+           estado->jugador.puntuacion, estado->jugador.estado, 
+           estado->juego_activo ? "SI" : "NO");
     
     return true;
 }

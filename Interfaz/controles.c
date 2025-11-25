@@ -75,20 +75,20 @@ void detectar_inputs_frame(FrameInputs *frame_inputs) {
     frame_inputs->num_inputs = 0;
     
     // KEY PRESSED
-    if (IsKeyPressed(KEY_LEFT)) {
-        strcpy(frame_inputs->inputs[frame_inputs->num_inputs++], "LEFT_PRESSED");
+    if (IsKeyDown(KEY_LEFT)) {
+        strcpy(frame_inputs->inputs[frame_inputs->num_inputs++], "LEFT");
     }
-    if (IsKeyPressed(KEY_RIGHT)) {
-        strcpy(frame_inputs->inputs[frame_inputs->num_inputs++], "RIGHT_PRESSED");
+    if (IsKeyDown(KEY_RIGHT)) {
+        strcpy(frame_inputs->inputs[frame_inputs->num_inputs++], "RIGHT");
     }
-    if (IsKeyPressed(KEY_UP)) {
-        strcpy(frame_inputs->inputs[frame_inputs->num_inputs++], "UP_PRESSED");
+    if (IsKeyDown(KEY_UP)) {
+        strcpy(frame_inputs->inputs[frame_inputs->num_inputs++], "UP");
     }
-    if (IsKeyPressed(KEY_DOWN)) {
-        strcpy(frame_inputs->inputs[frame_inputs->num_inputs++], "DOWN_PRESSED");
+    if (IsKeyDown(KEY_DOWN)) {
+        strcpy(frame_inputs->inputs[frame_inputs->num_inputs++], "DOWN");
     }
-    if (IsKeyPressed(KEY_SPACE)) {
-        strcpy(frame_inputs->inputs[frame_inputs->num_inputs++], "JUMP_PRESSED");
+    if (IsKeyDown(KEY_SPACE)) {
+        strcpy(frame_inputs->inputs[frame_inputs->num_inputs++], "JUMP");
     }
     
     // KEY RELEASED (opcional, para movimiento más preciso)

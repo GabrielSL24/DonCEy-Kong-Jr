@@ -1,5 +1,6 @@
 import java.io.*;
 import java.net.Socket;
+import java.nio.charset.StandardCharsets;
 
 //Adapter basico para enviar/recepcionar mensajes entre Java y C
 public class AdapterJ {
@@ -28,6 +29,28 @@ public class AdapterJ {
         System.out.println("Adapter: Recibido entero -> " + value);;
         return value;
     }
+
+    public void sendString(String data) throws IOException {
+        byte[] bytes = data.getBytes(StandardCharsets.UTF_8);
+        output.writeInt(bytes.length);          //Enviar longitud
+        output.write(bytes);                    //Enviar datos  
+        output.flush();
+        System.out.println("Adapter: Enviando string (" + bytes.length + " bytes)");
+    }
+
+    public String receiveString() throws IOException {
+        int length = input.readInt();
+        if (length <= 0 || length > 10000) {
+            throw new IOException("Tamaño de string invalido: " + length);
+        }
+        
+        byte[] bytes = new byte[length];
+        input.readFully(bytes);
+        String result = new String(bytes, StandardCharsets.UTF_8);
+        System.out.println("Adapter: Recibido string (" + length + " bytes)");
+        return result;
+    }
+
 
     public void sendIdentification(String clientType) throws IOException {
         int code = getClientType(clientType);

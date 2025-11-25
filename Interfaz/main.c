@@ -22,22 +22,56 @@ int main(void) {
     } else {
         printf("✅ Conectado al servidor\n");
     }
+
+    // Variables para control de tiempo (fuera del loop)
+    static float ultimo_envio = 0.0f;
+    static bool primer_input_enviado = false;
+    static float tiempo_inicio = 0.0f;
     
     // Bucle principal del juego
     while (!WindowShouldClose()) {
+
+        float tiempo_actual = GetTime();
+
         // 1. DETECTAR INPUTS
         detectar_inputs_frame(&inputs_frame);
         
         // 2. ENVIAR INPUTS AL SERVIDOR
         if (servidor_conectado) {
-            for (int i = 0; i < inputs_frame.num_inputs; i++) {
+            
+            // Inicializar tiempo_inicio en el primer frame
+            if (tiempo_inicio == 0.0f) {
+                tiempo_inicio = GetTime();
+            }
+
+            // Enviar inputs cada 100ms (10 FPS) para no saturar
+            if (inputs_frame.num_inputs > 0 && (tiempo_actual - ultimo_envio > 0.1f)) {
+                for (int i = 0; i < inputs_frame.num_inputs; i++) {
+                    printf("🎮 Enviando input: %s\n", inputs_frame.inputs[i]);
+                    enviar_input_al_servidor(
+                        CLIENT_PLAYER, 
+                        1, 
+                        "partida_default",
+                        "KEY_PRESSED",
+                        inputs_frame.inputs[i]
+                    );
+                }
+                primer_input_enviado = true;
+                ultimo_envio = tiempo_actual;
+            }
+
+            // Input automático después de 2 segundos si no se ha enviado nada 
+            if (!primer_input_enviado && (tiempo_actual - tiempo_inicio > 2.0f)) {
+                printf("🎮 Enviando input inicial de prueba...\n");
                 enviar_input_al_servidor(
                     CLIENT_PLAYER, 
                     1, 
                     "partida_default",
                     "KEY_PRESSED", 
-                    inputs_frame.inputs[i]
+                    "RIGHT"
                 );
+                primer_input_enviado = true;
+                ultimo_envio = tiempo_actual;
             }
         } else {
             // MODO LOCAL: Mostrar inputs detectados (debug)
