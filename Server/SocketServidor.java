@@ -25,13 +25,13 @@ public class SocketServidor {
             while (true) {
                 Socket client = serverSocket.accept();
                 String clientIP = client.getInetAddress().getHostAddress();
-                System.out.println("🔗 Nuevo cliente conectado desde: " + clientIP);
+                System.out.println("Nuevo cliente conectado desde: " + clientIP);
                 
                 ClientHandler clientHandler = new ClientHandler(client, this);
                 clientes.add(clientHandler);
                 new Thread(clientHandler).start();
 
-                 System.out.println("🎯 Juegos activos: " + clientes.size());
+                 System.out.println("Juegos activos: " + clientes.size());
             }
         } catch (Exception e) {
             e.printStackTrace();
@@ -40,7 +40,7 @@ public class SocketServidor {
 
     public void removeClient(ClientHandler client) {
         clientes.remove(client);
-        System.out.println("➖ Cliente desconectado. Juegos activos: " + clientes.size());
+        System.out.println("Cliente desconectado. Juegos activos: " + clientes.size());
     }
 }
 

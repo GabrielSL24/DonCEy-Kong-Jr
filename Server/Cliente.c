@@ -22,8 +22,8 @@ int main (int argc, char *argv[])
         strcpy_s(server_ip, sizeof(server_ip), __argv[1]);
     }
 
-    printf("🎮 Cliente DonCEy Kong Jr\n");
-    printf("🔌 Conectando a: %s:25557\n", server_ip);
+    printf("Cliente DonCEy Kong Jr\n");
+    printf("Conectando a: %s:25557\n", server_ip);
 
 	// Inicializar Winsock
 	WSADATA wsaData;
@@ -36,7 +36,7 @@ int main (int argc, char *argv[])
 	Socket_Con_Servidor = Abre_Conexion_Inet (server_ip, "25557");
 	if (Socket_Con_Servidor == INVALID_SOCKET) {
 		        printf("No se pudo conectar al servidor: %s\n", server_ip);
-        printf("💡 Verifica:\n");
+        printf("Verifica:\n");
         printf("   - Servidor ejecutándose\n");
         printf("   - ZeroTier conectado\n");
         printf("   - IP correcta del servidor\n");
@@ -84,3 +84,7 @@ int main (int argc, char *argv[])
     printf("Cliente finalizado\n");
     return 0;
 }
+
+
+//
+

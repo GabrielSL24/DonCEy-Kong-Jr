@@ -110,7 +110,7 @@ void detectar_inputs_frame(FrameInputs *frame_inputs) {
     
     // Debug: mostrar inputs detectados
     if (frame_inputs->num_inputs > 0) {
-        printf("🎮 Inputs detectados en frame: ");
+        printf("Inputs detectados en frame: ");
         for (int i = 0; i < frame_inputs->num_inputs; i++) {
             printf("%s ", frame_inputs->inputs[i]);
         }
