@@ -1,21 +1,46 @@
-public class BlueCroc extends Croc {
+/**
+ * Cocodrilo azul: desciende por la liana y muere cuando la abandona.
+ */
+public final class BlueCroc extends Croc {
 
-    private final int speed;
+    /**
+     * Velocidad en píxeles por actualización (mínimo 1).
+     */
+    private final Integer speed;
 
-    public BlueCroc(Vine vine, int initialY, int speed) {
+    /**
+     * Crea un cocodrilo azul.
+     *
+     * @param vine      liana a la que está asociado.
+     * @param initialY  posición vertical inicial.
+     * @param speed     velocidad de movimiento (se fuerza a mínimo 1).
+     */
+    public BlueCroc(final Vine vine,
+                    final Integer initialY,
+                    final Integer speed) {
         super(vine, initialY);
+        if (speed == null) {
+            throw new IllegalArgumentException("speed must not be null");
+        }
         this.speed = Math.max(1, speed);
     }
 
     @Override
     public void update() {
-        if (!alive) return;
+        if (!alive) {
+            return;
+        }
 
-        y += speed;
+        int iy = y;
+        final int s = speed;
+        iy += s;
 
-        // Si se salió de la vine, cae y muere
-        if (y > vine.getYBottom()) {
+        final int bottom = vine.getYBottom();
+        if (iy > bottom) {
+            // Se salió de la vine, cae y muere
             kill();
+        } else {
+            y = iy;
         }
     }
 }

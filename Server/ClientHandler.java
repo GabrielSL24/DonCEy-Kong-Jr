@@ -1,56 +1,70 @@
-import java.net.*;
-import java.io.*;
-import java.util.*;
+import java.net.Socket;
+import java.io.IOException;
 
-import java.util.concurrent.atomic.AtomicReference;
-
+/**
+ * Maneja la comunicación con UN cliente.
+ * 
+ * En el caso de JUGADOR:
+ * - Recibe JSON de input con teclas.
+ * - Actualiza PlayerInput.
+ * - Llama a GameLogic.update(input) para avanzar la lógica.
+ * - Construye un JSON de estado leyendo DIRECTO desde GameLogic
+ *   (jugador, cocodrilos, frutas) y lo envía al cliente C.
+ *
+ * NO se modifica la lógica interna de GameLogic:
+ * - No se implementa aún ganar/perder.
+ * - Solo se usa como fuente de verdad para el estado.
+ */
 public class ClientHandler implements Runnable {
-    private Socket socket;
-    private SocketServidor server;
+
+    private final Socket socket;
+    private final SocketServidor server;
     private AdapterJ adapter;
     private String clientType;
-    private int clientId;
+    private final int clientId;
     private static int nextId = 1;
 
-    //Simulacion
-    private float playerX = 100.0f;
-    private float playerY = 300.0f;
-    private int playerLives = 3;
-    private int playerScore = 0;
-    private String playerState = "STANDING";
-    private boolean gameActive = true;
-    private String gameId = "partida_" + System.currentTimeMillis();
+    // --- Lógica de juego (carpeta Logica) ---
+    private final GameLogic gameLogic;
 
-    //private DataInputStream input;
-    //private DataOutputStream output;
-    //private GameLogic gameLogic;
+    // Estado actual de las teclas del jugador
+    private PlayerInput currentInput;
+
+    // Estado visual de animación (para el campo "state" del JSON)
+    private String playerState = "STANDING";
+
+    // Id simple de la partida (ej. para espectadores/admin, a futuro)
+    private final String gameId = "partida_" + System.currentTimeMillis();
 
     public ClientHandler(Socket socket, SocketServidor server) {
         this.socket = socket;
         this.server = server;
-        //this.gameLogic = new GameLogic();
         this.clientId = nextId++;
+
+        // Instanciamos la lógica tal como está en Logica/
+        this.gameLogic = new GameLogic();
+
+        // Por defecto, ninguna tecla presionada
+        this.currentInput = new PlayerInput(false, false, false, false, false);
     }
-    
+
     @Override
     public void run() {
         try {
-            //input = new DataInputStream(socket.getInputStream());
-            //output = new DataOutputStream(socket.getOutputStream());
-
             adapter = new AdapterJ(socket);
             socket.setSoLinger(true, 10);
 
             System.out.println("Iniciando comunicacion con cliente " + clientId);
 
             // 1. Enviar identificacion del servidor
-            adapter.sendIdentification("SERVIDOR");;
+            adapter.sendIdentification("SERVIDOR");
 
             // 2. Recibir identificación del cliente
             clientType = adapter.receiveIdentification();
-            System.out.println("Cliente " + clientId + " es " + clientType + " desde " + socket.getInetAddress().getHostAddress());
-        
-            // 3. Manejar segun el tipo de cliente
+            System.out.println("Cliente " + clientId + " es " + clientType +
+                    " desde " + socket.getInetAddress().getHostAddress());
+
+            // 3. Manejar según tipo
             switch (clientType) {
                 case "JUGADOR":
                     handleJugador();
@@ -63,15 +77,19 @@ public class ClientHandler implements Runnable {
                     break;
                 default:
                     System.out.println("Tipo de cliente desconocido: " + clientType);
-            }     
-        } catch (Exception e){
+            }
+
+        } catch (Exception e) {
             System.out.println("Error con cliente " + clientId + ": " + e.getMessage());
+            e.printStackTrace();
         } finally {
             try {
-                if (adapter != null) adapter.close();
-                //if (input != null) input.close();
-                //if (output != null) output.close();
-                if (socket != null) socket.close();
+                if (adapter != null) {
+                    adapter.close();
+                }
+                if (socket != null) {
+                    socket.close();
+                }
                 server.removeClient(this);
                 System.out.println("Cliente " + clientId + " desconectado");
             } catch (IOException e) {
@@ -80,133 +98,180 @@ public class ClientHandler implements Runnable {
         }
     }
 
+    // =========================================================
+    //                       JUGADOR
+    // =========================================================
+
     private void handleJugador() throws IOException {
         System.out.println("Jugador " + clientId + " listo - INICIANDO PARTIDA: " + gameId);
-        
+
+        // Estado inicial tomando la lógica real
         System.out.println("Enviando estado inicial al jugador " + clientId);
         String jsonEstadoInicial = generarEstadoJuego();
         adapter.sendString(jsonEstadoInicial);
         System.out.println("Estado inicial enviado al jugador " + clientId);
 
         long ultimoEnvio = System.currentTimeMillis();
+        final long intervaloEnvioMs = 100; // ~10 FPS de estado
 
-        while (gameActive && !socket.isClosed()) {
+        // Por ahora, no usamos estado global: el juego se considera siempre activo
+        while (!socket.isClosed()) {
             try {
+                long ahora = System.currentTimeMillis();
 
-                //Verificar si hay datos disponibles
+                // 1) Leer input del cliente si hay datos
                 if (adapter.hayDatosDisponibles()) {
-
-                    // 1. Recibir JSON de input del cliente
                     String jsonInput = adapter.receiveString();
                     System.out.println("JSON recibido del cliente:");
                     System.out.println("   " + jsonInput);
-
-
-                    // 2. Procesar input (simulacion)
                     procesarInput(jsonInput);
                 }
 
-                 // 2. ENVIAR ESTADO PERIÓDICAMENTE (cada 100ms) incluso sin inputs
-                long ahora = System.currentTimeMillis();
-                if (ahora - ultimoEnvio >= 100) { // 10 FPS para el estado
+                // 2) Actualizar lógica y enviar estado cada intervalo
+                if (ahora - ultimoEnvio >= intervaloEnvioMs) {
+                    // Avanzar la lógica con el input actual
+                    gameLogic.update(currentInput);
+
+                    // Generar JSON del estado actual
                     String jsonEstado = generarEstadoJuego();
                     adapter.sendString(jsonEstado);
-                    System.out.println("📤 Estado enviado al cliente (posición: " + playerX + ", " + playerY + ")");
+
                     ultimoEnvio = ahora;
                 }
 
-                Thread.sleep(10); // Simular tiempo de frame
-
+                // Pequeño sleep para no saturar CPU
+                Thread.sleep(5);
             } catch (Exception e) {
-                System.out.println("Error en handleJugador " + e.getMessage());
+                System.out.println("Error en handleJugador: " + e.getMessage());
                 e.printStackTrace();
                 break;
             }
         }
-        System.out.println("Cliente " + clientId + " finalizado");    
+
+        System.out.println("Cliente " + clientId + " finalizado");
     }
 
-   
-
+    /**
+     * Procesa el JSON de input del cliente y actualiza:
+     * - currentInput (estado de teclas)
+     * - playerState (string para animación)
+     *
+     * JSON esperado:
+     * {
+     *   "input_type": "KEY_PRESSED" | "KEY_RELEASED",
+     *   "key": "LEFT" | "RIGHT" | "UP" | "DOWN" | "JUMP"
+     * }
+     */
     private void procesarInput(String jsonInput) {
         try {
-            // Parseaer JSON manualmente
             String inputType = extraerValor(jsonInput, "input_type");
             String key = extraerValor(jsonInput, "key");
 
             System.out.println("Procesando input: " + inputType + " - " + key);
 
-            //Simulacion de logica de juego
-            if("KEY_PRESSED".equals(inputType)) {
-                switch (key) {
-                    case "LEFT":
-                        playerX -= 5.0f;
+            boolean pressed = "KEY_PRESSED".equals(inputType);
+
+            boolean left = currentInput.isLeft();
+            boolean right = currentInput.isRight();
+            boolean up = currentInput.isUp();
+            boolean down = currentInput.isDown();
+            boolean jump = currentInput.isJump();
+
+            switch (key) {
+                case "LEFT":
+                    left = pressed;
+                    if (pressed) {
                         playerState = "MOVING_LEFT";
-                        break;
-                    case "RIGHT":
-                        playerX += 5.0f;
+                    }
+                    break;
+                case "RIGHT":
+                    right = pressed;
+                    if (pressed) {
                         playerState = "MOVING_RIGHT";
-                        break;
-                    case "UP":
-                        playerY -= 5.0f;
+                    }
+                    break;
+                case "UP":
+                    up = pressed;
+                    if (pressed) {
                         playerState = "CLIMBING";
-                        break;
-                    case "DOWN":
-                        playerY += 5.0f;
+                    }
+                    break;
+                case "DOWN":
+                    down = pressed;
+                    if (pressed) {
                         playerState = "FALLING";
-                        break;
-                    case "JUMP":
-                        playerY -= 10.0f; // Simular salto
+                    }
+                    break;
+                case "JUMP":
+                    jump = pressed;
+                    if (pressed) {
                         playerState = "JUMPING";
-                        break;
-                }
-            } else if ("KEY_RELEASED".equals(inputType)) {
-                if ("LEFT".equals(key) || "RIGHT".equals(key)) {
-                    playerState = "STANDING";
-                }
+                    }
+                    break;
+                default:
+                    // Tecla desconocida, la ignoramos
+                    break;
             }
 
-            //Simular recoleccion de frutas y colisiones
-            playerScore += 10;
-            if (playerScore > 1000) {
-                playerScore = 0;
-                playerLives++;
+            // Si suelta izquierda/derecha, volvemos a STANDING
+            if ("KEY_RELEASED".equals(inputType)
+                    && ("LEFT".equals(key) || "RIGHT".equals(key))) {
+                playerState = "STANDING";
             }
 
-            //Limitar poscion (bordes)
-            if (playerX < 0) playerX = 0;
-            if (playerX > 800) playerX = 800;
-            if (playerY < 0) playerY = 0;
-            if (playerY > 600) {
-                playerY = 600;
-                playerLives--;
-                if (playerLives <= 0) {
-                    gameActive = false;
-                    System.out.println("Jugador " + clientId + " ha perdido todas las vidas. Fin del juego.");
-                }
-            }
+            // Actualizamos el objeto PlayerInput que la lógica consumirá
+            currentInput = new PlayerInput(left, right, up, down, jump);
 
         } catch (Exception e) {
             System.out.println("Error procesando input JSON: " + e.getMessage());
+            e.printStackTrace();
         }
     }
 
+    /**
+     * Extrae un valor string del JSON en formato "clave":"valor".
+     * Parser mínimo para este uso concreto.
+     */
     private String extraerValor(String json, String clave) {
         String patron = "\"" + clave + "\":\"";
         int inicio = json.indexOf(patron);
-        if (inicio == -1) return "";
-
+        if (inicio == -1) {
+            return "";
+        }
         inicio += patron.length();
         int fin = json.indexOf("\"", inicio);
-        if (fin == -1) return "";
-
+        if (fin == -1) {
+            return "";
+        }
         return json.substring(inicio, fin);
     }
 
-
+    /**
+     * Construye el JSON de estado leyendo DIRECTAMENTE desde GameLogic:
+     *
+     * {
+     *   "game_id": "...",
+     *   "timestamp": ...,
+     *   "game_active": true,
+     *   "changes": {
+     *     "player": {...},
+     *     "enemies": [...],
+     *     "fruits": [...]
+     *   }
+     * }
+     *
+     * NOTA: game_active se deja en true por ahora.
+     */
     private String generarEstadoJuego() {
-        // Generar JSON manualmente
         StringBuilder json = new StringBuilder();
+
+        // Por ahora el juego se considera siempre activo
+        boolean gameActive = true;
+
+        // --- Player desde lógica ---
+        Player player = gameLogic.getPlayer();
+        float playerX = player.getX(); // en píxeles, según tu lógica
+        float playerY = player.getY();
 
         json.append("{\n");
         json.append("  \"game_id\":\"").append(gameId).append("\",\n");
@@ -217,55 +282,80 @@ public class ClientHandler implements Runnable {
         json.append("      \"x\": ").append(playerX).append(",\n");
         json.append("      \"y\": ").append(playerY).append(",\n");
         json.append("      \"state\":\"").append(playerState).append("\",\n");
-        json.append("      \"lives\":").append(playerLives).append(",\n");
-        json.append("      \"score\":").append(playerScore).append(",\n");
+        json.append("      \"lives\":").append(player.getLives()).append(",\n");
+        json.append("      \"score\":").append(player.getScore()).append(",\n");
         json.append("      \"active\":").append(gameActive).append("\n");
         json.append("    },\n");
+
+        // --- Enemigos (cocodrilos) ---
         json.append("    \"enemies\":[\n");
-        json.append("      {\n");
-        json.append("        \"id\":\"croco1\",\n");
-        json.append("        \"type\":\"RED_CROCODILE\",\n");
-        json.append("        \"x\":200.0,\n");
-        json.append("        \"y\":150.0,\n");
-        json.append("        \"active\":true\n");
-        json.append("      }\n");
-        json.append("    ],\n");
+        int enemyIndex = 0;
+        for (Croc c : gameLogic.getCrocs()) {
+            if (c != null && c.isAlive()) {
+                if (enemyIndex > 0) {
+                    json.append(",\n");
+                }
+                float ex = c.getX();
+                float ey = c.getY();
+                String type = (c instanceof RedCroc) ? "RED_CROCODILE" : "BLUE_CROCODILE";
+
+                json.append("      {\n");
+                json.append("        \"id\":\"croc_").append(enemyIndex).append("\",\n");
+                json.append("        \"type\":\"").append(type).append("\",\n");
+                json.append("        \"x\":").append(ex).append(",\n");
+                json.append("        \"y\":").append(ey).append(",\n");
+                json.append("        \"active\":true\n");
+                json.append("      }");
+
+                enemyIndex++;
+            }
+        }
+        json.append("\n    ],\n");
+
+        // --- Frutas ---
         json.append("    \"fruits\":[\n");
-        json.append("      {\n");
-        json.append("        \"id\":\"fruit1\",\n");
-        json.append("        \"type\":\"BANANA\",\n");
-        json.append("        \"points\":100,\n");
-        json.append("        \"x\":350.0,\n");
-        json.append("        \"y\":220.0,\n");
-        json.append("        \"active\":true\n");
-        json.append("      }\n");
-        json.append("    ]\n");
+        int fruitIndex = 0;
+        for (Fruit f : gameLogic.getFruits()) {
+            if (!f.isActive()) {
+                continue;
+            }
+            if (fruitIndex > 0) {
+                json.append(",\n");
+            }
+            float fx = f.getX();
+            float fy = f.getY();
+
+            json.append("      {\n");
+            json.append("        \"id\":\"fruit_").append(fruitIndex).append("\",\n");
+            json.append("        \"type\":\"BANANA\",\n");
+            json.append("        \"points\":").append(f.getPoints()).append(",\n");
+            json.append("        \"x\":").append(fx).append(",\n");
+            json.append("        \"y\":").append(fy).append(",\n");
+            json.append("        \"active\":true\n");
+            json.append("      }");
+
+            fruitIndex++;
+        }
+        json.append("\n    ]\n");
+
         json.append("  }\n");
         json.append("}");
-        
+
         String resultado = json.toString();
-        System.out.println("📤 JSON generado para cliente:");
+        System.out.println("📤 JSON generado para cliente " + clientId + ":");
         System.out.println(resultado);
-        System.out.println("📏 Tamaño: " + resultado.length() + " caracteres");
-        
+
         return resultado;
     }
 
-
-
-
-
-
-
-
-
-
-
-
+    // =========================================================
+    //                   ESPECTADOR / ADMIN
+    // =========================================================
 
     private void handleEspectador() throws IOException {
         System.out.println("Espectador " + clientId + " observando");
 
+        // Ejemplo simple de protocolo con enteros
         adapter.sendInt(200);
 
         for (int i = 0; i < 10; i++) {
@@ -284,11 +374,11 @@ public class ClientHandler implements Runnable {
 
         adapter.sendInt(300);
 
-        // Recibir algunos comandos de ejemplo
+        // Ejemplo simple de eco de comandos
         for (int i = 0; i < 3; i++) {
             int comando = adapter.receiveInt();
             System.out.println("Admin " + clientId + " envió comando: " + comando);
-            adapter.sendInt(comando + 1000); // Confirmación
+            adapter.sendInt(comando + 1000);
         }
     }
 }

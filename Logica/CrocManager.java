@@ -3,55 +3,72 @@ import java.util.HashMap;
 import java.util.Map;
 
 /**
- * Administra cocodrilos por vine fija.
- * Regla: máximo 1 cocodrilo vivo por vine.
+ * Administra cocodrilos por liana fija.
+ * <p>
+ * Regla básica: máximo 1 cocodrilo vivo por liana.
  */
-public class CrocManager {
+public final class CrocManager {
 
     private final Map<Integer, Croc> crocsByVine = new HashMap<>();
 
-    /** Devuelve true si se puede crear un nuevo cocodrilo en la vine. */
-    public boolean canSpawnOn(Vine vine) {
-        Croc existing = crocsByVine.get(vine.getId());
+    /**
+     * Indica si se puede crear un nuevo cocodrilo en la liana dada.
+     * <p>
+     * Solo se permite spawnear si no hay cocodrilo vivo en esa liana.
+     *
+     * @param vine liana objetivo.
+     * @return {@code true} si se puede spawnear; {@code false} en caso contrario.
+     */
+    public boolean canSpawnOn(final Vine vine) {
+        if (vine == null) {
+            return false;
+        }
+        final Croc existing = crocsByVine.get(vine.getId());
         return existing == null || !existing.isAlive();
     }
 
-    /** Crea un cocodrilo rojo si la vine está libre. */
-    public Croc spawnRed(Vine vine, int initialY, int speed) {
-        if (!canSpawnOn(vine)) return null;
-        Croc c = new RedCroc(vine, initialY, speed);
-        crocsByVine.put(vine.getId(), c);
-        return c;
+    /**
+     * Registra o reemplaza el cocodrilo asociado a la liana del propio croc.
+     *
+     * @param croc cocodrilo a registrar.
+     */
+    public void putCroc(final Croc croc) {
+        if (croc == null || croc.getVine() == null) {
+            return;
+        }
+        crocsByVine.put(croc.getVine().getId(), croc);
     }
 
-    /** Crea un cocodrilo azul si la vine está libre. */
-    public Croc spawnBlue(Vine vine, int initialY, int speed) {
-        if (!canSpawnOn(vine)) return null;
-        Croc c = new BlueCroc(vine, initialY, speed);
-        crocsByVine.put(vine.getId(), c);
-        return c;
-    }
-
-    /** Actualiza el movimiento de todos los cocodrilos activos. */
+    /**
+     * Actualiza todos los cocodrilos vivos.
+     */
     public void updateAll() {
-        for (Croc c : crocsByVine.values()) {
-            if (c != null && c.isAlive()) {
-                c.update();
+        for (Croc croc : crocsByVine.values()) {
+            if (croc != null && croc.isAlive()) {
+                croc.update();
             }
         }
     }
 
-    /** Devuelve todos los cocodrilos (vivos o muertos). */
+    /**
+     * @return colección de todos los cocodrilos registrados (vivos o muertos).
+     */
     public Collection<Croc> getAllCrocs() {
         return crocsByVine.values();
     }
 
-    /** Elimina cocodrilos muertos (opcional, para limpieza). */
+    /**
+     * Elimina las entradas cuyo cocodrilo esté muerto o sea {@code null}.
+     */
     public void removeDead() {
-        crocsByVine.entrySet().removeIf(e -> e.getValue() == null || !e.getValue().isAlive());
+        crocsByVine.entrySet().removeIf(
+                e -> e.getValue() == null || !e.getValue().isAlive()
+        );
     }
 
-    /** Limpia todo (reinicia nivel). */
+    /**
+     * Limpia todos los cocodrilos (reinicio de nivel).
+     */
     public void clear() {
         crocsByVine.clear();
     }

@@ -1,207 +1,194 @@
 import java.util.ArrayList;
-import java.util.Iterator;
+import java.util.Collection;
 import java.util.List;
 
 /**
  * Lógica principal del juego (lado servidor, sin red).
- * - Mantiene jugador(es), crocs, frutas, vines fijas.
- * - Aplica reglas al recibir posiciones desde C.
+ * <p>
+ * Esta versión implementa:
+ * <ul>
+ *     <li>Mapa estático (plataformas, lianas, meta, abismo) vía {@link GameConfig}.</li>
+ *     <li>Jugador con movimiento y colisión contra plataformas.</li>
+ *     <li>Administración de cocodrilos y frutas creados por el administrador.</li>
+ * </ul>
  */
-public class GameLogic {
+public final class GameLogic {
 
-    private final Vine[] vines;
+    private final List<Platform> platforms;
+    private final List<Vine> vines;
+    private final Point2i goalPosition;
+    private final Rect abyssZone;
+
+    private final Player player;
+
     private final CrocManager crocManager;
     private final List<Fruit> fruits;
 
-    private final Player player;      // si luego tienes 2, se extiende
-    private int level = 1;
-    private float speedMul = 1.0f;
-
+    /**
+     * Crea un nuevo estado de juego con el nivel por defecto.
+     */
     public GameLogic() {
+        this.platforms = GameConfig.createPlatforms();
         this.vines = GameConfig.createVines();
+        this.goalPosition = GameConfig.createGoalPosition();
+        this.abyssZone = GameConfig.getAbyssZone();
+
+        final Point2i spawn = GameConfig.createPlayerSpawn(platforms);
+        this.player = new Player(
+                spawn.getX(),
+                spawn.getY(),
+                Integer.valueOf(3),          // vidas iniciales
+                GameConfig.PLAYER_SIZE       // tamaño del jugador
+        );
+
         this.crocManager = new CrocManager();
         this.fruits = new ArrayList<>();
-
-        // Posición inicial de Jr (ajusta según tu mapa)
-        this.player = new Player(10, 5, 3);
     }
 
-    public Player getPlayer() { return player; }
-    public Iterable<Croc> getCrocs() { return crocManager.getAllCrocs(); }
-    public List<Fruit> getFruits() { return fruits; }
-    public Vine[] getVines() { return vines; }
-
-    public int getLevel() { return level; }
-    public float getSpeedMul() { return speedMul; }
-
-    // ================== Admin API ==================
-
-    public boolean adminSpawnRedCroc(int vineId, int y, int baseSpeed) {
-        Vine v = findVine(vineId);
-        if (v == null) return false;
-        int speed = Math.max(1, Math.round(baseSpeed * speedMul));
-        return crocManager.spawnRed(v, y, speed) != null;
-    }
-
-    public boolean adminSpawnBlueCroc(int vineId, int y, int baseSpeed) {
-        Vine v = findVine(vineId);
-        if (v == null) return false;
-        int speed = Math.max(1, Math.round(baseSpeed * speedMul));
-        return crocManager.spawnBlue(v, y, speed) != null;
-    }
-
-    public void adminCreateFruit(int x, int y, int points) {
-        fruits.add(new Fruit(x, y, points));
-    }
-
-    public void adminDeleteFruitAt(int x, int y) {
-        Iterator<Fruit> it = fruits.iterator();
-        while (it.hasNext()) {
-            Fruit f = it.next();
-            if (f.getX() == x && f.getY() == y) {
-                it.remove();
-                return;
-            }
-        }
-    }
-
-    // ================== Loop del servidor ==================
+    // ==================== BUCLE PRINCIPAL ====================
 
     /**
-     * El cliente C envía la posición nueva del jugador.
-     * Aquí la validamos y actualizamos estado del juego.
+     * Actualiza la lógica del juego para un frame.
+     *
+     * @param input estado de entrada del jugador recibido desde el cliente.
      */
-    public void updatePlayerFromClient(int newX, int newY) {
-        // Validación de límites
-        if (newX < 0) newX = 0;
-        if (newX >= 30) newX = 29;
-        if (newY < 0) newY = 0;
-        if (newY >= 40) newY = 39;
-        
-        System.out.println("GameLogic - Actualizando jugador a: (" + newX + ", " + newY + ")");
-        
-        // ✅ DEBUG: Verificar abismo ANTES de procesar
-        boolean esAbismo = GameConfig.isAbyss(newX);
-        System.out.println("🔍 DEBUG Abismo check: y=" + newX + " -> " + esAbismo);
-        
-        if (esAbismo) {
-            System.out.println("JUGADOR CAYÓ AL ABISMO - Activando handlePlayerFall");
-            handlePlayerFall();
-            return;
-        }
+    public void update(final PlayerInput input) {
+        // 1) Actualizar movimiento del jugador con colisión contra plataformas
+        player.update(input, platforms, vines);
 
-        // Actualizar posición
-        player.setPosition(newX, newY);
-
-        // DEBUG: Verificar meta
-        boolean esMeta = GameConfig.isGoalPosition(newX, newY);
-        System.out.println("🔍 DEBUG Meta check: (" + newX + "," + newY + ") -> " + esMeta);
-        
-        if (esMeta) {
-            System.out.println("JUGADOR GANÓ - Activando handleWin");
-            handleWin();
-            return;
-        }
-
-        // DEBUG: Verificar colisiones
-        System.out.println("DEBUG Verificando colisiones...");
-        checkCrocCollisions();
-        checkFruitCollisions();
-        
-        System.out.println("DEBUG: Update completado sin Game Over");
-    }
-
-    /** Llamar cada tick del servidor para mover crocs. */
-    public void updateEnemies() {
+        // 2) Actualizar cocodrilos
         crocManager.updateAll();
+        crocManager.removeDead();
+
+        // 3) Próximos pasos:
+        //    - colisión jugador/cocodrilos
+        //    - colisión jugador/frutas
+        //    - colisión con meta
+        //    - colisión con abismo
     }
 
-    // ================== Reglas internas ==================
+    // ==================== GETTERS DE ESTADO ====================
 
-    private void handlePlayerFall() {
-       System.out.println("💀 handlePlayerFall() llamado - Vidas antes: " + player.getLives());
-        player.loseLife();
-        System.out.println("💀 Vidas después: " + player.getLives());
-        
-        if (player.getLives() <= 0) {
-            System.out.println("🛑 GAME OVER - Sin vidas restantes");
-            // Aquí deberías manejar el game over sin cerrar el servidor
-        } else {
-            System.out.println("🔄 Respawneando jugador...");
-            respawnPlayer();
+    public Player getPlayer() {
+        return player;
+    }
+
+    public List<Platform> getPlatforms() {
+        return new ArrayList<>(platforms);
+    }
+
+    public List<Vine> getVines() {
+        return new ArrayList<>(vines);
+    }
+
+    public Point2i getGoalPosition() {
+        return goalPosition;
+    }
+
+    public Rect getAbyssZone() {
+        return abyssZone;
+    }
+
+    /**
+     * @return colección de todos los cocodrilos.
+     */
+    public Collection<Croc> getCrocs() {
+        return crocManager.getAllCrocs();
+    }
+
+    /**
+     * @return lista de frutas activas/inactivas.
+     */
+    public List<Fruit> getFruits() {
+        return new ArrayList<>(fruits);
+    }
+
+    // ==================== API PARA ADMIN ====================
+
+    /**
+     * Crea un cocodrilo rojo en la liana indicada, si las reglas lo permiten.
+     *
+     * @param vineId   identificador de la liana.
+     * @param initialY posición vertical inicial en píxeles.
+     * @param speed    velocidad del cocodrilo.
+     * @return {@code true} si se creó con éxito; {@code false} si no se pudo.
+     */
+    public boolean adminSpawnRedCroc(final Integer vineId,
+                                     final Integer initialY,
+                                     final Integer speed) {
+        if (vineId == null || initialY == null || speed == null) {
+            return false;
         }
+        final Vine vine = findVine(vineId);
+        if (vine == null) {
+            return false;
+        }
+        if (!crocManager.canSpawnOn(vine)) {
+            return false;
+        }
+        final Croc croc = new RedCroc(vine, initialY, speed);
+        crocManager.putCroc(croc);
+        return true;
     }
 
-    private void handleWin() {
-        System.out.println("🎉 handleWin() llamado");
-        player.gainLife();
-        level++;
-        speedMul += 0.25f;
-        System.out.println("🎉 Nuevo nivel: " + level + ", SpeedMul: " + speedMul);
-        resetLevel();
+    /**
+     * Crea un cocodrilo azul en la liana indicada, si las reglas lo permiten.
+     */
+    public boolean adminSpawnBlueCroc(final Integer vineId,
+                                      final Integer initialY,
+                                      final Integer speed) {
+        if (vineId == null || initialY == null || speed == null) {
+            return false;
+        }
+        final Vine vine = findVine(vineId);
+        if (vine == null) {
+            return false;
+        }
+        if (!crocManager.canSpawnOn(vine)) {
+            return false;
+        }
+        final Croc croc = new BlueCroc(vine, initialY, speed);
+        crocManager.putCroc(croc);
+        return true;
     }
 
-    private void resetLevel() {
-        // Limpia crocs y frutas, respawnea jugador, etc.
-        // Simplificado:
+    /**
+     * Crea una fruta en la posición indicada.
+     *
+     * @param x      coordenada X del centro, en píxeles.
+     * @param y      coordenada Y del centro, en píxeles.
+     * @param points puntos que otorgará al ser recogida.
+     * @return la fruta creada, o {@code null} si los parámetros son inválidos.
+     */
+    public Fruit adminSpawnFruit(final Integer x,
+                                 final Integer y,
+                                 final Integer points) {
+        if (x == null || y == null || points == null) {
+            return null;
+        }
+        final Fruit fruit = new Fruit(x, y, points);
+        fruits.add(fruit);
+        return fruit;
+    }
+
+    /**
+     * Elimina todas las frutas y cocodrilos.
+     */
+    public void adminClearEntities() {
+        crocManager.clear();
         fruits.clear();
-        // no hay método clear en CrocManager, pero podrías recrearlo o añadir clear().
-        respawnPlayer();
     }
 
-    private void respawnPlayer() {
-        // Ajusta a la posición inicial de tu mapa
-        player.setPosition(2, 26);
-        player.setOnVine(false);
-    }
+    // ==================== HELPERS PRIVADOS ====================
 
-    private void checkCrocCollisions() {
-        int px = player.getX();
-        int py = player.getY();
-
-        System.out.println("🔍 DEBUG checkCrocCollisions - Jugador en: (" + px + "," + py + ")");
-
-        for (Croc c : crocManager.getAllCrocs()) {
-            if (c != null && c.isAlive()) {
-                System.out.println("🔍 DEBUG Cocodrilo en: (" + c.getX() + "," + c.getY() + ")");
-                if (c.getX() == px && c.getY() == py) {
-                    System.out.println("🐊 COLISIÓN CON COCODRILO DETECTADA");
-                    player.loseLife();
-                    if (player.getLives() <= 0) {
-                        System.out.println("🛑 GAME OVER por cocodrilo");
-                    } else {
-                        System.out.println("🔄 Respawn por cocodrilo");
-                        respawnPlayer();
-                    }
-                    return;
-                }
-            }
+    private Vine findVine(final Integer vineId) {
+        if (vineId == null) {
+            return null;
         }
-        System.out.println("✅ DEBUG: Sin colisiones con cocodrilos");
-    }
-
-    private void checkFruitCollisions() {
-        int px = player.getX();
-        int py = player.getY();
-
-        for (Fruit f : fruits) {
-            if (f.isActive() && f.getX() == px && f.getY() == py) {
-                player.addScore(f.getPoints());
-                f.collect();
-            }
-        }
-    }
-
-    private boolean isOnAnyVine(int x, int y) {
         for (Vine v : vines) {
-            if (v.contains(x, y)) return true;
-        }
-        return false;
-    }
-
-    private Vine findVine(int vineId) {
-        for (Vine v : vines) {
-            if (v.getId() == vineId) return v;
+            if (v.getId().equals(vineId)) {
+                return v;
+            }
         }
         return null;
     }
