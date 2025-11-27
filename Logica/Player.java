@@ -172,22 +172,30 @@ public final class Player {
             // En el aire: acelerar hasta un máximo y aplicar frenado si no hay input
             if (input.isLeft() && !input.isRight()) {
                 newVx -= PlayerPhysicsConfig.AIR_ACCELERATION;
+                // Limitar velocidad máxima
+                if (newVx < -PlayerPhysicsConfig.HORIZONTAL_SPEED_AIR) {
+                    newVx = -PlayerPhysicsConfig.HORIZONTAL_SPEED_AIR;
+                }
             } else if (input.isRight() && !input.isLeft()) {
                 newVx += PlayerPhysicsConfig.AIR_ACCELERATION;
+                // Limitar velocidad máxima
+                if (newVx > PlayerPhysicsConfig.HORIZONTAL_SPEED_AIR) {
+                    newVx = PlayerPhysicsConfig.HORIZONTAL_SPEED_AIR;
+                }
             } else {
                 // Sin input horizontal: aplicar frenado en aire
                 newVx *= PlayerPhysicsConfig.AIR_FRICTION;
-                if (Math.abs(newVx) < 0.3f) {
+                if (Math.abs(newVx) < 0.1f) {
                     newVx = 0.0f;
                 }
             }
 
-            final float maxAir = PlayerPhysicsConfig.HORIZONTAL_SPEED_AIR;
-            if (newVx > maxAir) {
-                newVx = maxAir;
-            } else if (newVx < -maxAir) {
-                newVx = -maxAir;
-            }
+            //final float maxAir = PlayerPhysicsConfig.HORIZONTAL_SPEED_AIR;
+            //if (newVx > maxAir) {
+            //    newVx = maxAir;
+            //} else if (newVx < -maxAir) {
+            //    newVx = -maxAir;
+            //}
         }
 
         velocityX = newVx;

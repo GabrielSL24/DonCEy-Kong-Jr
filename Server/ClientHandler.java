@@ -114,6 +114,8 @@ public class ClientHandler implements Runnable {
         long ultimoEnvio = System.currentTimeMillis();
         final long intervaloEnvioMs = 100; // ~10 FPS de estado
 
+        socket.setSoTimeout(50); // 50ms timeout
+
         // Por ahora, no usamos estado global: el juego se considera siempre activo
         while (!socket.isClosed()) {
             try {
@@ -169,6 +171,26 @@ public class ClientHandler implements Runnable {
 
             System.out.println("Procesando input: " + inputType + " - " + key);
 
+            if (key.endsWith("_RELEASED")) {
+                String realKey = key.substring(0, key.length() - 9); // quitar "_RELEASED"
+                System.out.println("CORRECCIÓN: Convirtiendo '" + key + "' a KEY_RELEASED con key '" + realKey + "'");
+                inputType = "KEY_RELEASED";
+                key = realKey;
+            }
+            
+            if (key.endsWith("_PRESSED")) {
+                String realKey = key.substring(0, key.length() - 8); // quitar "_PRESSED"  
+                System.out.println("CORRECCIÓN: Convirtiendo '" + key + "' a KEY_PRESSED con key '" + realKey + "'");
+                inputType = "KEY_PRESSED";
+                key = realKey;
+            }
+            
+            // Validar que tenemos valores correctos
+            if (inputType.isEmpty() || key.isEmpty()) {
+                System.out.println("ERROR: InputType o Key están vacíos. JSON: " + jsonInput);
+                return;
+            }
+            
             boolean pressed = "KEY_PRESSED".equals(inputType);
 
             boolean left = currentInput.isLeft();
@@ -213,14 +235,13 @@ public class ClientHandler implements Runnable {
                     break;
             }
 
-            // Si suelta izquierda/derecha, volvemos a STANDING
-            if ("KEY_RELEASED".equals(inputType)
-                    && ("LEFT".equals(key) || "RIGHT".equals(key))) {
-                playerState = "STANDING";
-            }
-
             // Actualizamos el objeto PlayerInput que la lógica consumirá
             currentInput = new PlayerInput(left, right, up, down, jump);
+
+            System.out.println("Input actualizado - L:" + left + " R:" + right + 
+                        " U:" + up + " D:" + down + " J:" + jump + 
+                        " State:" + playerState);
+
 
         } catch (Exception e) {
             System.out.println("Error procesando input JSON: " + e.getMessage());
@@ -233,17 +254,56 @@ public class ClientHandler implements Runnable {
      * Parser mínimo para este uso concreto.
      */
     private String extraerValor(String json, String clave) {
-        String patron = "\"" + clave + "\":\"";
-        int inicio = json.indexOf(patron);
-        if (inicio == -1) {
+        try {
+            // Buscar el patrón con la clave
+            String patron = "\"" + clave + "\":";
+            int inicio = json.indexOf(patron);
+            if (inicio == -1) {
+                System.out.println("DEBUG: No se encontró la clave '" + clave + "' en JSON: " + json);
+                return "";
+            }
+            
+            inicio += patron.length();
+            
+            // Buscar el inicio del valor (saltar espacios)
+            while (inicio < json.length() && Character.isWhitespace(json.charAt(inicio))) {
+                inicio++;
+            }
+            
+            if (inicio >= json.length()) {
+                return "";
+            }
+            
+            char primerChar = json.charAt(inicio);
+            
+            // Determinar si el valor es string (entre comillas) o otro tipo
+            if (primerChar == '"') {
+                // Valor es string entre comillas
+                inicio++; // saltar la comilla inicial
+                int fin = json.indexOf("\"", inicio);
+                if (fin == -1) {
+                    return "";
+                }
+                return json.substring(inicio, fin);
+            } else {
+                // Valor es número, bool, o cualquier cosa sin comillas
+                int fin = json.indexOf(",", inicio);
+                if (fin == -1) {
+                    fin = json.indexOf("}", inicio);
+                }
+                if (fin == -1) {
+                    fin = json.indexOf("\n", inicio); // también buscar fin de línea
+                }
+                if (fin == -1) {
+                    return json.substring(inicio).trim();
+                }
+                return json.substring(inicio, fin).trim();
+            }
+        } catch (Exception e) {
+            System.out.println("Error extrayendo valor '" + clave + "' de JSON: " + json);
+            e.printStackTrace();
             return "";
         }
-        inicio += patron.length();
-        int fin = json.indexOf("\"", inicio);
-        if (fin == -1) {
-            return "";
-        }
-        return json.substring(inicio, fin);
     }
 
     /**

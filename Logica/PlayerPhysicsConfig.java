@@ -24,13 +24,13 @@ public final class PlayerPhysicsConfig {
     public static final Float HORIZONTAL_SPEED_GROUND = 3.5f;
 
     /** Factor de frenado en el aire cuando no hay input (FRENADO_AIRE en C). */
-    public static final Float AIR_FRICTION = 0.85f;
+    public static final Float AIR_FRICTION = 0.7f;
 
     /** Velocidad máxima de caída (VELOCIDAD_MAXIMA_CAIDA en C). */
     public static final Float MAX_FALL_SPEED = 8.0f;
 
     /** Incremento de velocidad horizontal al acelerar en el aire (0.5 en C). */
-    public static final Float AIR_ACCELERATION = 0.5f;
+    public static final Float AIR_ACCELERATION = 0.3f;
 
     // ---------------- LIANAS ----------------
 
