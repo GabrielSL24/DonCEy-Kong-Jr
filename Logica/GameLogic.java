@@ -30,6 +30,10 @@ public final class GameLogic {
     private final List<Fruit> fruits;
 
     private int level;
+
+    private int nextFruitId = 1;
+
+
     
 
     /**
@@ -197,48 +201,65 @@ public final class GameLogic {
     }
 
     /**
-     * Crea una fruta en la posición indicada.
+     * Crea una fruta sobre una liana.
      *
-     * @param x      coordenada X del centro, en píxeles.
-     * @param y      coordenada Y del centro, en píxeles.
-     * @param points puntos que otorgará al ser recogida.
-     * @return {@code true} si se creó con éxito; {@code false} si los parámetros son inválidos.
+     * @param vineId  identificador de la liana.
+     * @param offsetY desplazamiento desde la parte superior de la liana, en píxeles.
+     *                Debe estar entre 0 y vine.getLength().
+     * @param points  puntos que otorga la fruta.
+     * @return {@code true} si se creó con éxito; {@code false} si algún dato es inválido.
      */
-    public boolean adminSpawnFruit(final Integer x,
-                                   final Integer y,
-                                   final Integer points) {
-        if (x == null || y == null || points == null) {
+    public boolean adminSpawnFruitOnVine(final Integer vineId,
+                                        final Integer offsetY,
+                                        final Integer points) {
+        if (vineId == null || offsetY == null || points == null) {
             return false;
         }
-        final Fruit fruit = new Fruit(x, y, points);
+
+        final Vine vine = findVine(vineId);
+        if (vine == null) {
+            return false;
+        }
+
+        final int length = vine.getLength();
+        if (offsetY < 0 || offsetY > length) {
+            return false;
+        }
+
+        final int id = generateFruitId();
+        final int x = vine.getCenterX();
+        final int y = vine.getYTop() + offsetY;
+
+        final Fruit fruit = new Fruit(id, x, y, points);
         fruits.add(fruit);
+
         return true;
     }
 
+
+
     /**
-     * Elimina la primera fruta que se encuentre en la posición indicada.
+     * Elimina la fruta con el ID especificado.
      *
-     * @param x coordenada X del centro, en píxeles.
-     * @param y coordenada Y del centro, en píxeles.
-     * @return {@code true} si se eliminó alguna fruta; {@code false} si no se encontró.
+     * @param fruitId ID único de la fruta.
+     * @return true si la fruta fue encontrada y eliminada, false si no existe.
      */
-    public boolean adminRemoveFruit(final Integer x,
-                                    final Integer y) {
-        if (x == null || y == null) {
+    public boolean adminRemoveFruit(final Integer fruitId) {
+        if (fruitId == null) {
             return false;
         }
 
         for (int i = 0; i < fruits.size(); i++) {
-            final Fruit fruit = fruits.get(i);
-            if (fruit != null
-                && x.equals(fruit.getX())
-                && y.equals(fruit.getY())) {
+            final Fruit f = fruits.get(i);
+            if (f != null && fruitId.equals(f.getId())) {
                 fruits.remove(i);
                 return true;
             }
         }
+
         return false;
     }
+
 
     /**
      * Elimina todas las frutas y cocodrilos.
@@ -298,6 +319,10 @@ public final class GameLogic {
 
         // respawn
         respawnPlayer();
+    }
+
+    private int generateFruitId() {
+        return nextFruitId++;
     }
 
 }

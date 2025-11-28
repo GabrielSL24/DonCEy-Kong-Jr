@@ -120,4 +120,22 @@ public final class Vine {
         return ipx >= cx - hw && ipx <= cx + hw
             && ipy >= top     && ipy <= bottom;
     }
+
+        /**
+     * Largo de la liana en píxeles.
+     *
+     * @return diferencia entre yBottom y yTop (siempre >= 0).
+     */
+    public Integer getLength() {
+        return yBottom - yTop;
+    }
+
+    /**
+     * Coordenada X del centro de la liana.
+     *
+     * @return posición horizontal en píxeles.
+     */
+    public Integer getCenterX() {
+        return x;
+    }
 }
