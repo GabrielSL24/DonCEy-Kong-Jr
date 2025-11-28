@@ -172,17 +172,4 @@ public final class GameConfig {
         final int y = 2 * CELL_SIZE + CELL_SIZE / 2;
         return new Point2i(x, y);
     }
-
-    /**
-     * Zona de abismo/agua en la parte inferior de la pantalla.
-     * <p>
-     * Usa {@link #WATER_HEIGHT}, que viene de {@code AGUA_HEIGHT} en C.
-     *
-     * @return rectángulo que representa el área mortal de agua.
-     */
-    public static Rect getAbyssZone() {
-        final int height = WATER_HEIGHT;
-        final int y = SCREEN_HEIGHT - height;
-        return new Rect(0, y, SCREEN_WIDTH, height);
-    }
 }

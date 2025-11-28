@@ -17,12 +17,20 @@ public final class GameLogic {
     private final List<Platform> platforms;
     private final List<Vine> vines;
     private final Point2i goalPosition;
-    private final Rect abyssZone;
+    private static final int DEATH_Y = GameConfig.SCREEN_HEIGHT;
+
+
+    private final Point2i playerSpawn;
+
+    private boolean gameOver;
 
     private final Player player;
 
     private final CrocManager crocManager;
     private final List<Fruit> fruits;
+
+    private int level;
+    
 
     /**
      * Crea un nuevo estado de juego con el nivel por defecto.
@@ -31,18 +39,19 @@ public final class GameLogic {
         this.platforms = GameConfig.createPlatforms();
         this.vines = GameConfig.createVines();
         this.goalPosition = GameConfig.createGoalPosition();
-        this.abyssZone = GameConfig.getAbyssZone();
 
-        final Point2i spawn = GameConfig.createPlayerSpawn(platforms);
+        this.playerSpawn = GameConfig.createPlayerSpawn(platforms);
         this.player = new Player(
-                spawn.getX(),
-                spawn.getY(),
+                playerSpawn.getX(),
+                playerSpawn.getY(),
                 Integer.valueOf(3),          // vidas iniciales
                 GameConfig.PLAYER_SIZE       // tamaño del jugador
         );
 
         this.crocManager = new CrocManager();
         this.fruits = new ArrayList<>();
+        this.gameOver = false;
+        this.level = 1;
     }
 
     // ==================== BUCLE PRINCIPAL ====================
@@ -53,6 +62,10 @@ public final class GameLogic {
      * @param input estado de entrada del jugador recibido desde el cliente.
      */
     public void update(final PlayerInput input) {
+        if (gameOver) {
+            return;
+        }
+
         // 1) Actualizar movimiento del jugador con colisión contra plataformas
         player.update(input, platforms, vines);
 
@@ -60,17 +73,56 @@ public final class GameLogic {
         crocManager.updateAll();
         crocManager.removeDead();
 
-        // 3) Próximos pasos:
-        //    - colisión jugador/cocodrilos
-        //    - colisión jugador/frutas
-        //    - colisión con meta
-        //    - colisión con abismo
+        // 3) Colisión jugador/cocodrilos
+        final Rect playerBounds = player.getBounds();
+        for (Croc croc : crocManager.getAllCrocs()) {
+            if (croc != null && croc.isAlive() && playerBounds.intersects(croc.getBounds())) {
+                onPlayerKilled();
+                return;
+            }
+        }
+
+        // 4) Colisión jugador/frutas
+        for (Fruit fruit : fruits) {
+            if (fruit != null && fruit.isActive() &&
+                playerBounds.intersects(fruit.getBounds())) {
+
+                // sumar puntos
+                player.addScore(fruit.getPoints());
+
+                // marcar fruta como recogida
+                fruit.collect();
+            }
+        }
+
+        // Colisión con abismo (caída fuera del nivel)
+        if (player.getY() > GameConfig.SCREEN_HEIGHT) {
+            onPlayerKilled();
+            return;
+}
+        // 6) Victoria si llega a la meta
+        if (checkVictory()) {
+            onVictory();
+        }
     }
 
     // ==================== GETTERS DE ESTADO ====================
 
     public Player getPlayer() {
         return player;
+    }
+
+    /**
+     * Entrada: ninguna.
+     * Restricción: ninguna.
+     * Salida: true si la partida ya terminó.
+     */
+    public boolean isGameOver() {
+        return gameOver;
+    }
+
+    public int getLevel() {
+        return level;
     }
 
     public List<Platform> getPlatforms() {
@@ -83,10 +135,6 @@ public final class GameLogic {
 
     public Point2i getGoalPosition() {
         return goalPosition;
-    }
-
-    public Rect getAbyssZone() {
-        return abyssZone;
     }
 
     /**
@@ -113,10 +161,8 @@ public final class GameLogic {
      * @param speed    velocidad del cocodrilo.
      * @return {@code true} si se creó con éxito; {@code false} si no se pudo.
      */
-    public boolean adminSpawnRedCroc(final Integer vineId,
-                                     final Integer initialY,
-                                     final Integer speed) {
-        if (vineId == null || initialY == null || speed == null) {
+    public boolean adminSpawnRedCroc(final Integer vineId) {
+        if (vineId == null) {
             return false;
         }
         final Vine vine = findVine(vineId);
@@ -126,7 +172,7 @@ public final class GameLogic {
         if (!crocManager.canSpawnOn(vine)) {
             return false;
         }
-        final Croc croc = new RedCroc(vine, initialY, speed);
+        final Croc croc = new RedCroc(vine);
         crocManager.putCroc(croc);
         return true;
     }
@@ -134,10 +180,8 @@ public final class GameLogic {
     /**
      * Crea un cocodrilo azul en la liana indicada, si las reglas lo permiten.
      */
-    public boolean adminSpawnBlueCroc(final Integer vineId,
-                                      final Integer initialY,
-                                      final Integer speed) {
-        if (vineId == null || initialY == null || speed == null) {
+    public boolean adminSpawnBlueCroc(final Integer vineId) {
+        if (vineId == null) {
             return false;
         }
         final Vine vine = findVine(vineId);
@@ -147,7 +191,7 @@ public final class GameLogic {
         if (!crocManager.canSpawnOn(vine)) {
             return false;
         }
-        final Croc croc = new BlueCroc(vine, initialY, speed);
+        final Croc croc = new BlueCroc(vine);
         crocManager.putCroc(croc);
         return true;
     }
@@ -158,17 +202,42 @@ public final class GameLogic {
      * @param x      coordenada X del centro, en píxeles.
      * @param y      coordenada Y del centro, en píxeles.
      * @param points puntos que otorgará al ser recogida.
-     * @return la fruta creada, o {@code null} si los parámetros son inválidos.
+     * @return {@code true} si se creó con éxito; {@code false} si los parámetros son inválidos.
      */
-    public Fruit adminSpawnFruit(final Integer x,
-                                 final Integer y,
-                                 final Integer points) {
+    public boolean adminSpawnFruit(final Integer x,
+                                   final Integer y,
+                                   final Integer points) {
         if (x == null || y == null || points == null) {
-            return null;
+            return false;
         }
         final Fruit fruit = new Fruit(x, y, points);
         fruits.add(fruit);
-        return fruit;
+        return true;
+    }
+
+    /**
+     * Elimina la primera fruta que se encuentre en la posición indicada.
+     *
+     * @param x coordenada X del centro, en píxeles.
+     * @param y coordenada Y del centro, en píxeles.
+     * @return {@code true} si se eliminó alguna fruta; {@code false} si no se encontró.
+     */
+    public boolean adminRemoveFruit(final Integer x,
+                                    final Integer y) {
+        if (x == null || y == null) {
+            return false;
+        }
+
+        for (int i = 0; i < fruits.size(); i++) {
+            final Fruit fruit = fruits.get(i);
+            if (fruit != null
+                && x.equals(fruit.getX())
+                && y.equals(fruit.getY())) {
+                fruits.remove(i);
+                return true;
+            }
+        }
+        return false;
     }
 
     /**
@@ -181,6 +250,29 @@ public final class GameLogic {
 
     // ==================== HELPERS PRIVADOS ====================
 
+    /**
+     * Entrada: ninguna.
+     * Restricción: playerSpawn debe ser una posición válida.
+     * Salida: Reposiciona al jugador al punto de aparición inicial.
+     */
+    private void respawnPlayer() {
+        player.resetTo(playerSpawn.getX(), playerSpawn.getY());
+    }
+
+    /**
+     * Entrada: ninguna.
+     * Restricción: Debe existir un jugador válido.
+     * Salida: Resta una vida al jugador y decide si hay respawn o game over.
+     */
+    private void onPlayerKilled() {
+        player.loseLife();
+        if (player.getLives() <= 0) {
+            gameOver = true;
+        } else {
+            respawnPlayer();
+        }
+    }
+
     private Vine findVine(final Integer vineId) {
         if (vineId == null) {
             return null;
@@ -192,4 +284,20 @@ public final class GameLogic {
         }
         return null;
     }
+
+    private boolean checkVictory() {
+        Rect r = player.getBounds();
+        return r.contains(goalPosition.getX(), goalPosition.getY());
+    }
+
+    private void onVictory() {
+        level++;
+
+        // aumentar velocidad de cocodrilos
+        crocManager.increaseSpeedMultiplier();
+
+        // respawn
+        respawnPlayer();
+    }
+
 }
