@@ -5,7 +5,6 @@
  * al ser recogida y luego pasa a estado inactivo.
  */
 public final class Fruit {
-
     private final Integer id;
     private final Integer x;
     private final Integer y;
@@ -30,6 +29,7 @@ public final class Fruit {
         this.x = x;
         this.y = y;
         this.points = points;
+        this.id = id;
     }
 
     
@@ -71,6 +71,10 @@ public final class Fruit {
      */
     public void collect() {
         active = false;
+    }
+
+    public Integer getId() {
+        return id;
     }
 
     /**
