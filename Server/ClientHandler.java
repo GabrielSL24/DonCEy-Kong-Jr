@@ -1,23 +1,15 @@
 import java.net.Socket;
 import java.util.List;
 import java.io.IOException;
+import java.util.concurrent.BlockingQueue;
+import java.util.concurrent.LinkedBlockingQueue;
 
 /**
  * Maneja la comunicación con UN cliente.
- * 
- * En el caso de JUGADOR:
- * - Recibe JSON de input con teclas.
- * - Actualiza PlayerInput.
- * - Llama a GameLogic.update(input) para avanzar la lógica.
- * - Construye un JSON de estado leyendo DIRECTO desde GameLogic
- *   (jugador, cocodrilos, frutas) y lo envía al cliente C.
- *
- * NO se modifica la lógica interna de GameLogic:
- * - No se implementa aún ganar/perder.
- * - Solo se usa como fuente de verdad para el estado.
+ * CORREGIDO: Eliminada lectura concurrente del socket
  */
 public class ClientHandler implements Runnable {
-
+    private final Object socketLock = new Object();
     private final Socket socket;
     private final SocketServidor server;
     private AdapterJ adapter;
@@ -25,33 +17,26 @@ public class ClientHandler implements Runnable {
     private final int clientId;
     private static int nextId = 1;
 
-    // --- Lógica de juego (carpeta Logica) ---
     private final GameLogic gameLogic;
-
-    // Estado actual de las teclas del jugador
     private PlayerInput currentInput;
-
-    // Estado visual de animación (para el campo "state" del JSON)
     private String playerState = "STANDING";
 
-    // Estado de la conexion
     private String gameId = null;
     private boolean enPartida = false;
     private boolean esEspectador = false;
 
-    private long ultimoEnvio = System.currentTimeMillis();
-    private final long intervaloEnvioMs = 100; // ~10 FPS
+    // Cola para comunicación entre hilos
+    private final BlockingQueue<String> inputQueue = new LinkedBlockingQueue<>();
+    private volatile boolean running = true;
 
     public ClientHandler(Socket socket, SocketServidor server) {
         this.socket = socket;
         this.server = server;
         this.clientId = nextId++;
-
-        // Instanciamos la lógica tal como está en Logica/
         this.gameLogic = new GameLogic();
-
-        // Por defecto, ninguna tecla presionada
         this.currentInput = new PlayerInput(false, false, false, false, false);
+        
+        System.out.println("🆕 NUEVO ClientHandler creado para cliente " + clientId);
     }
 
     @Override
@@ -59,6 +44,7 @@ public class ClientHandler implements Runnable {
         try {
             adapter = new AdapterJ(socket);
             socket.setSoLinger(true, 10);
+            socket.setSoTimeout(5000); // Aumentar timeout a 5 segundos
 
             System.out.println("Iniciando comunicacion con cliente " + clientId);
 
@@ -67,50 +53,101 @@ public class ClientHandler implements Runnable {
 
             // 2. Recibir identificación del cliente
             clientType = adapter.receiveIdentification();
-            System.out.println("Cliente " + clientId + " es " + clientType +
-                    " desde " + socket.getInetAddress().getHostAddress());
+            System.out.println("Cliente " + clientId + " es " + clientType);
 
-            
-            // 3. Bucle principal de recepcion de mensajes
-            while (!socket.isClosed()) {
+            // 3. Bucle principal - ÚNICO LUGAR DONDE SE LEE DEL SOCKET
+            while (running && !socket.isClosed()) {
                 try {
                     if (adapter.hayDatosDisponibles()) {
-                        String mensajeJson = adapter.receiveString();
-                        System.out.println("Mensaje recibido del cliente " + clientId + ":");
-                        System.out.println("   " + mensajeJson);
+                        String mensajeJson = leerMensajeSeguro();
+                        
+                        if (mensajeJson == null) {
+                            System.out.println("⚠️ Mensaje nulo recibido, ignorando");
+                            continue;
+                        }
+                        
+                        System.out.println("📥 Mensaje recibido del cliente " + clientId + ":");
+                        System.out.println("   " + mensajeJson.substring(0, Math.min(100, mensajeJson.length())));
 
-                        procesarMensajeCliente(mensajeJson);
+                        // Determinar tipo de mensaje
+                        String requestType = extraerValor(mensajeJson, "request_type");
+                        
+                        if ("GAME_INPUT".equals(requestType) && enPartida) {
+                            // Input de juego - agregar a cola para procesamiento
+                            inputQueue.offer(mensajeJson);
+                        } else {
+                            // Mensaje de control - procesar inmediatamente
+                            procesarMensajeCliente(mensajeJson);
+                        }
                     }
-                    Thread.sleep(10);
-
+                    
+                    Thread.sleep(10); // Pequeña pausa
+                    
                 } catch (Exception e) {
-                    System.out.println("Error en bucle principal cliente " + clientId + ": " + e.getMessage());
-                    break;
+                    System.out.println("❌ Error en bucle principal cliente " + clientId + ": " + e.getMessage());
+                    if (e.getMessage() != null && e.getMessage().contains("Socket closed")) {
+                        break;
+                    }
                 }
             }
 
         } catch (Exception e) {
             System.out.println("Error con cliente " + clientId + ": " + e.getMessage());
             e.printStackTrace();
-
         } finally {
-            // Limpieza al desconectar
-            if (enPartida && gameId != null) {
-                salirDePartida();
-            }
+            cleanup();
+        }
+    }
 
+    /**
+     * Método seguro para leer mensajes del socket CON VALIDACIÓN
+     */
+    private String leerMensajeSeguro() {
+        synchronized (socketLock) {
             try {
-                if (adapter != null) adapter.close();
-                if (socket != null) socket.close();
-                server.removeClient(this);
-                System.out.println("Cliente " + clientId + " desconectado");
+                String mensaje = adapter.receiveString();
+                
+                // Validación básica
+                if (mensaje == null || mensaje.isEmpty()) {
+                    return null;
+                }
+                
+                // Verificar que sea JSON válido (comienza con '{' y termina con '}')
+                String trimmed = mensaje.trim();
+                if (!trimmed.startsWith("{") || !trimmed.endsWith("}")) {
+                    System.out.println("⚠️ Mensaje no parece JSON válido: " + trimmed.substring(0, Math.min(50, trimmed.length())));
+                    return null;
+                }
+                
+                return mensaje;
+                
             } catch (IOException e) {
-                e.printStackTrace();
+                System.out.println("❌ Error leyendo mensaje: " + e.getMessage());
+                running = false;
+                return null;
             }
         }
     }
 
-    //Procesa cualquier mensaje JSON
+    private void cleanup() {
+        running = false;
+        
+        if (enPartida && gameId != null) {
+            salirDePartida();
+        }
+        
+        try {
+            if (adapter != null) adapter.close();
+            if (socket != null && !socket.isClosed()) socket.close();
+            server.removeClient(this);
+            System.out.println("Cliente " + clientId + " desconectado");
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+    }
+
+    // ==================== PROCESAR MENSAJES ====================
+
     private void procesarMensajeCliente(String mensajeJson) {
         try {
             String clientType = extraerValor(mensajeJson, "client_type");
@@ -126,7 +163,7 @@ public class ClientHandler implements Runnable {
             } else if ("SPECTATOR".equals(clientType)) {
                 procesarMensajeEspectador(requestType, gameId, mensajeJson);
             } else {
-            enviarError("CLIENT_TYPE_INVALID", "Tipo de cliente no válido: " + clientType);
+                enviarError("CLIENT_TYPE_INVALID", "Tipo de cliente no válido: " + clientType);
             }
         } catch (Exception e) {
             System.out.println("Error procesando mensaje: " + e.getMessage());
@@ -135,8 +172,9 @@ public class ClientHandler implements Runnable {
         }
     }
 
-    // Procesa mensajes de JUGADOR
     private void procesarMensajeJugador(String requestType, String gameId, String mensajeJson) {
+        System.out.println("🎯 Procesando mensaje jugador: " + requestType + " para partida: " + gameId);
+        
         switch (requestType) {
             case "CREATE_GAME":
                 crearPartidaJugador(gameId);
@@ -145,20 +183,21 @@ public class ClientHandler implements Runnable {
                 unirJugadorAPartida(gameId);
                 break;
             case "START_GAME":
+                System.out.println("🚀 START_GAME recibido, iniciando partida...");
                 iniciarPartida(gameId);
                 break;
             case "LEAVE_GAME":
                 salirDePartida();
                 break;
             case "GAME_INPUT":
-                procesarInput(mensajeJson);
+                // NO procesar aquí - se procesa en el bucle de juego
+                System.out.println("⚠️ GAME_INPUT recibido fuera del bucle de juego - ignorando");
                 break;
             default:
                 enviarError("REQUEST_INVALID", "Tipo de request no válido: " + requestType);
         }
     }
 
-    // Procesa mensajes de ESPECTADOR
     private void procesarMensajeEspectador(String requestType, String gameId, String mensajeJson) {
         switch (requestType) {
             case "LIST_GAMES":
@@ -175,41 +214,52 @@ public class ClientHandler implements Runnable {
         }
     }
 
-    // Crear una nueva partida para el jugador
+    // ==================== CREAR/UNIR PARTIDAS ====================
+
     private void crearPartidaJugador(String gameIdSolicitado) {
         try {
-            String gameIdFinal = (gameIdSolicitado != null && !gameIdSolicitado.isEmpty()) ? 
-                                gameIdSolicitado : server.crearPartida(this);
+            System.out.println("🎯 SOLICITUD CREAR PARTIDA: " + gameIdSolicitado);
             
+            String gameIdFinal = server.crearPartida(this);
+            
+            System.out.println("✅ PARTIDA ASIGNADA: " + gameIdFinal);
             this.gameId = gameIdFinal;
             this.enPartida = true;
             this.esEspectador = false;
             
+            Thread.sleep(100);
+            
             SocketServidor.Partida partida = server.obtenerPartida(gameIdFinal);
             
-            // Enviar confirmación
+            if (partida == null) {
+                System.out.println("❌ ERROR: Partida no encontrada después de crearla!");
+                Thread.sleep(200);
+                partida = server.obtenerPartida(gameIdFinal);
+                
+                if (partida == null) {
+                    System.out.println("❌ ERROR CRÍTICO: Partida sigue sin existir después de 2 intentos");
+                    enviarError("GAME_CREATION_FAILED", "Error interno del servidor");
+                    return;
+                }
+            }
+            
+            System.out.println("✅ PARTIDA CONFIRMADA EN SERVIDOR");
+            
             String respuesta = String.format(
                 "{\"response_type\":\"GAME_CREATED\",\"game_id\":\"%s\",\"timestamp\":%d,\"status\":\"SUCCESS\",\"message\":\"Partida creada exitosamente\"}",
                 gameIdFinal, System.currentTimeMillis());
                 
-            adapter.sendString(respuesta);
-            System.out.println("✅ Partida creada: " + gameIdFinal + " para jugador " + clientId);
-            
-            // ENVIAR ESTADO INICIAL INMEDIATAMENTE
-            if (partida != null) {
-                String estadoInicial = generarEstadoJuego(partida.logica);
-                adapter.sendString(estadoInicial);
-                System.out.println("📤 Estado inicial enviado al jugador");
-            }
+            enviarMensajeSeguro(respuesta);
+            System.out.println("✅ Confirmación GAME_CREATED enviada al cliente");
             
         } catch (Exception e) {
-            System.out.println("Error creando partida: " + e.getMessage());
-            enviarError("GAME_CREATION_FAILED", "No se pudo crear la partida");
+            System.out.println("❌ Error creando partida: " + e.getMessage());
+            e.printStackTrace();
+            enviarError("GAME_CREATION_FAILED", "Error: " + e.getMessage());
         }
     }
 
-    // Unir jugador a una partida existente
-     private void unirJugadorAPartida(String gameId) {
+    private void unirJugadorAPartida(String gameId) {
         try {
             if (server.unirJugadorAPartida(gameId, this)) {
                 this.gameId = gameId;
@@ -217,15 +267,10 @@ public class ClientHandler implements Runnable {
                 this.esEspectador = false;
                 
                 String respuesta = String.format(
-                    "{\n" +
-                    "  \"response_type\": \"GAME_JOINED\",\n" +
-                    "  \"game_id\": \"%s\",\n" +
-                    "  \"timestamp\": %d,\n" +
-                    "  \"status\": \"SUCCESS\",\n" +
-                    "  \"message\": \"Unido a partida exitosamente\"\n" +
-                    "}", gameId, System.currentTimeMillis());
+                    "{\"response_type\":\"GAME_JOINED\",\"game_id\":\"%s\",\"timestamp\":%d,\"status\":\"SUCCESS\",\"message\":\"Unido a partida exitosamente\"}",
+                    gameId, System.currentTimeMillis());
                     
-                adapter.sendString(respuesta);
+                enviarMensajeSeguro(respuesta);
                 System.out.println("Jugador " + clientId + " unido a partida: " + gameId);
             } else {
                 enviarError("GAME_JOIN_FAILED", "No se pudo unir a la partida: " + gameId);
@@ -236,38 +281,157 @@ public class ClientHandler implements Runnable {
         }
     }
 
-    // Iniciar la partida
     private void iniciarPartida(String gameId) {
-    try {
-        SocketServidor.Partida partida = server.obtenerPartida(gameId);
-        if (partida != null && partida.jugador == this) {
+        try {
+            System.out.println("🚀 SOLICITUD INICIAR PARTIDA: " + gameId);
+            
+            SocketServidor.Partida partida = server.obtenerPartida(gameId);
+            
+            if (partida == null) {
+                System.out.println("❌ PARTIDA NO ENCONTRADA: " + gameId);
+                enviarError("GAME_START_FAILED", "Partida no encontrada: " + gameId);
+                return;
+            }
+            
+            if (partida.jugador != this) {
+                System.out.println("❌ JUGADOR NO COINCIDE");
+                enviarError("GAME_START_FAILED", "No eres el jugador de esta partida");
+                return;
+            }
+            
             partida.activa = true;
             
-            // 1. Enviar confirmación de inicio
             String respuesta = String.format(
                 "{\"response_type\":\"GAME_STARTED\",\"game_id\":\"%s\",\"timestamp\":%d,\"status\":\"SUCCESS\"}",
                 gameId, System.currentTimeMillis());
-            adapter.sendString(respuesta);
+            enviarMensajeSeguro(respuesta);
             
-            // 2. Enviar estado inicial del juego inmediatamente
-            String estadoInicial = generarEstadoJuego(partida.logica);
-            adapter.sendString(estadoInicial);
+            System.out.println("🎮 Partida INICIADA: " + gameId + " para jugador " + clientId);
             
-            System.out.println("🎮 Partida iniciada: " + gameId);
+            // Iniciar bucle de juego en hilo separado
+            Thread gameThread = new Thread(this::bucleJuegoJugador);
+            gameThread.setDaemon(true);
+            gameThread.setName("GameLoop-" + clientId);
+            gameThread.start();
             
-            // 3. Iniciar el bucle de juego
-            new Thread(this::bucleJuegoJugador).start();
-        } else {
-            enviarError("GAME_START_FAILED", "No se puede iniciar la partida");
+            System.out.println("🔄 Bucle de juego iniciado en hilo separado");
+            
+        } catch (Exception e) {
+            System.out.println("❌ Error iniciando partida: " + e.getMessage());
+            e.printStackTrace();
+            enviarError("GAME_START_FAILED", "Error iniciando partida: " + e.getMessage());
         }
-    } catch (Exception e) {
-        System.out.println("Error iniciando partida: " + e.getMessage());
-        enviarError("GAME_START_FAILED", "Error iniciando partida");
     }
-}
 
-    // Une espectador a una partida existente
-     private void unirEspectadorAPartida(String gameId) {
+    // ==================== BUCLE DE JUEGO ====================
+
+    private void bucleJuegoJugador() {
+        try {
+            System.out.println("🎮 INICIANDO BUCLE DE JUEGO para jugador " + clientId);
+            SocketServidor.Partida partida = server.obtenerPartida(gameId);
+            
+            if (partida == null) {
+                System.out.println("❌ Partida no encontrada: " + gameId);
+                return;
+            }
+            
+            long ultimoEnvioLocal = System.currentTimeMillis();
+            final long intervaloEnvioMsLocal = 50;
+            int frameCount = 0;
+            
+            while (running && enPartida && !socket.isClosed() && partida.activa) {
+                try {
+                    long ahora = System.currentTimeMillis();
+                    frameCount++;
+                    
+                    // 1) Procesar inputs de la cola (NO leer del socket)
+                    String jsonInput = inputQueue.poll(); // No bloqueante
+                    if (jsonInput != null) {
+                        procesarInput(jsonInput);
+                    }
+                    
+                    // 2) Actualizar lógica del juego
+                    partida.logica.update(currentInput);
+                    
+                    // 3) Enviar estado periódicamente
+                    if (ahora - ultimoEnvioLocal >= intervaloEnvioMsLocal) {
+                        String jsonEstado = generarEstadoJuego(partida.logica);
+                        enviarMensajeSeguro(jsonEstado);
+                        ultimoEnvioLocal = ahora;
+                        
+                        if (frameCount % 20 == 0) {
+                            System.out.println("📤 Estado enviado (frame " + frameCount + ")");
+                        }
+                    }
+                    
+                    Thread.sleep(10);
+                } catch (Exception e) {
+                    System.out.println("❌ Error en bucle de juego: " + e.getMessage());
+                    break;
+                }
+            }
+            
+            System.out.println("🛑 Bucle de juego terminado");
+        } catch (Exception e) {
+            System.out.println("❌ Error en bucle de juego: " + e.getMessage());
+            e.printStackTrace();
+        }
+    }
+
+    private void bucleJuegoEspectador() {
+        try {
+            System.out.println("Iniciando bucle de espectador " + clientId + " en partida: " + gameId);
+            SocketServidor.Partida partida = server.obtenerPartida(gameId);
+            
+            if (partida == null) {
+                System.out.println("Partida no encontrada para espectador: " + gameId);
+                return;
+            }
+            
+            long ultimoEnvioLocal = System.currentTimeMillis();
+            final long intervaloEnvioMsLocal = 100;
+            
+            while (running && enPartida && !socket.isClosed() && partida.activa) {
+                try {
+                    long ahora = System.currentTimeMillis();
+                    
+                    if (ahora - ultimoEnvioLocal >= intervaloEnvioMsLocal) {
+                        String jsonEstado = generarEstadoJuego(partida.logica);
+                        enviarMensajeSeguro(jsonEstado);
+                        ultimoEnvioLocal = ahora;
+                    }
+                    
+                    Thread.sleep(50);
+                } catch (Exception e) {
+                    System.out.println("Error en bucle espectador: " + e.getMessage());
+                    break;
+                }
+            }
+        } catch (Exception e) {
+            System.out.println("Error en bucle espectador: " + e.getMessage());
+            e.printStackTrace();
+        }
+    }
+
+    /**
+     * Método sincronizado para enviar mensajes
+     */
+    private void enviarMensajeSeguro(String mensaje) {
+        synchronized (socketLock) {
+            try {
+                if (adapter != null && !socket.isClosed()) {
+                    adapter.sendString(mensaje);
+                }
+            } catch (IOException e) {
+                System.out.println("❌ Error enviando mensaje: " + e.getMessage());
+                running = false;
+            }
+        }
+    }
+
+    // ==================== ESPECTADOR ====================
+
+    private void unirEspectadorAPartida(String gameId) {
         try {
             if (server.unirEspectadorAPartida(gameId, this)) {
                 this.gameId = gameId;
@@ -275,17 +439,12 @@ public class ClientHandler implements Runnable {
                 this.esEspectador = true;
                 
                 String respuesta = String.format(
-                    "{\n" +
-                    "  \"response_type\": \"SPECTATOR_JOINED\",\n" +
-                    "  \"game_id\": \"%s\",\n" +
-                    "  \"timestamp\": %d,\n" +
-                    "  \"status\": \"SUCCESS\"\n" +
-                    "}", gameId, System.currentTimeMillis());
+                    "{\"response_type\":\"SPECTATOR_JOINED\",\"game_id\":\"%s\",\"timestamp\":%d,\"status\":\"SUCCESS\"}",
+                    gameId, System.currentTimeMillis());
                     
-                adapter.sendString(respuesta);
+                enviarMensajeSeguro(respuesta);
                 System.out.println("Espectador " + clientId + " unido a partida: " + gameId);
                 
-                // Iniciar el bucle de espectador
                 new Thread(this::bucleJuegoEspectador).start();
             } else {
                 enviarError("SPECTATOR_JOIN_FAILED", "No se pudo unir como espectador: " + gameId);
@@ -296,8 +455,7 @@ public class ClientHandler implements Runnable {
         }
     }
 
-    // Envia lista de partidas disponibles
-     private void enviarListaPartidas() {
+    private void enviarListaPartidas() {
         try {
             List<SocketServidor.InfoPartida> partidas = server.obtenerListaPartidas();
             StringBuilder json = new StringBuilder();
@@ -322,7 +480,7 @@ public class ClientHandler implements Runnable {
             json.append("  ]\n");
             json.append("}");
             
-            adapter.sendString(json.toString());
+            enviarMensajeSeguro(json.toString());
             System.out.println("Lista de partidas enviada a espectador " + clientId);
             
         } catch (Exception e) {
@@ -331,214 +489,61 @@ public class ClientHandler implements Runnable {
         }
     }
 
-    // Bucle principal de juego para JUGADOR
-    private void bucleJuegoJugador() {
-        try {
-            System.out.println("🎮 Iniciando bucle de juego para jugador " + clientId + " en partida: " + gameId);
-            SocketServidor.Partida partida = server.obtenerPartida(gameId);
-            
-            if (partida == null) {
-                System.out.println("❌ Partida no encontrada: " + gameId);
-                return;
-            }
-            
-            long ultimoEnvioLocal = System.currentTimeMillis();
-            final long intervaloEnvioMsLocal = 100; // ~10 FPS
-            
-            // IMPORTANTE: Configurar timeout para no bloquear
-            socket.setSoTimeout(50);
-            
-            while (enPartida && !socket.isClosed() && partida.activa) {
-                try {
-                    long ahora = System.currentTimeMillis();
-                    
-                    // 1) Leer input del cliente si hay datos
-                    if (adapter.hayDatosDisponibles()) {
-                        String jsonInput = adapter.receiveString();
-                        System.out.println("🎮 Input recibido del jugador " + clientId + ": " + jsonInput);
-                        procesarInput(jsonInput);
-                    }
-                    
-                    // 2) Actualizar lógica y enviar estado cada intervalo
-                    if (ahora - ultimoEnvioLocal >= intervaloEnvioMsLocal) {
-                        // Avanzar la lógica con el input actual
-                        partida.logica.update(currentInput);
-                        
-                        // Generar y enviar estado
-                        String jsonEstado = generarEstadoJuego(partida.logica);
-                        adapter.sendString(jsonEstado);
-                        
-                        ultimoEnvioLocal = ahora;
-                    }
-                    
-                    Thread.sleep(5);
-                } catch (java.net.SocketTimeoutException e) {
-                    // Timeout normal, continuar
-                } catch (Exception e) {
-                    System.out.println("Error en bucle de juego: " + e.getMessage());
-                    break;
-                }
-            }
-        } catch (Exception e) {
-            System.out.println("Error en bucle de juego jugador: " + e.getMessage());
-            e.printStackTrace();
-        }
-    }
+    // ==================== SALIR ====================
 
-    // Bucle para ESPECTADOR
-    private void bucleJuegoEspectador() {
-        try {
-            System.out.println("Iniciando bucle de espectador " + clientId + " en partida: " + gameId);
-            SocketServidor.Partida partida = server.obtenerPartida(gameId);
-            
-            if (partida == null) {
-                System.out.println("Partida no encontrada para espectador: " + gameId);
-                return;
-            }
-            
-            long ultimoEnvioLocal = System.currentTimeMillis();
-            final long intervaloEnvioMsLocal = 100;
-            
-            while (enPartida && !socket.isClosed() && partida.activa) {
-                try {
-                    long ahora = System.currentTimeMillis();
-                    
-                    // Enviar estado al espectador periódicamente
-                    if (ahora - ultimoEnvioLocal >= intervaloEnvioMsLocal) {
-                        String jsonEstado = generarEstadoJuego(partida.logica);
-                        adapter.sendString(jsonEstado);
-                        ultimoEnvioLocal = ahora;
-                    }
-                    
-                    Thread.sleep(50);
-                } catch (Exception e) {
-                    System.out.println("Error en bucle espectador: " + e.getMessage());
-                    break;
-                }
-            }
-        } catch (Exception e) {
-            System.out.println("Error en bucle espectador: " + e.getMessage());
-            e.printStackTrace();
-        }
-    }
-
-    // Enviar el estado de la partida a todos los clientes
-     private void enviarEstadoPartida(SocketServidor.Partida partida) {
-        try {
-            String jsonEstado = generarEstadoJuego(partida.logica);
-            
-            // Enviar al jugador
-            if (partida.jugador != null && partida.jugador.adapter != null) {
-                partida.jugador.adapter.sendString(jsonEstado);
-            }
-            
-            // Enviar a todos los espectadores
-            for (ClientHandler espectador : partida.espectadores) {
-                if (espectador.adapter != null) {
-                    try {
-                        espectador.adapter.sendString(jsonEstado);
-                    } catch (IOException e) {
-                        System.out.println("Error enviando a espectador " + espectador.clientId + ": " + e.getMessage());
-                        // Remover espectador si hay error
-                        partida.espectadores.remove(espectador);
-                    }
-                }
-            }
-        } catch (Exception e) {
-            System.out.println("Error enviando estado de partida: " + e.getMessage());
-        }
-    }
-
-    // Salir de la partida actual
     private void salirDePartida() {
         if (gameId != null && enPartida) {
             System.out.println("Cliente " + clientId + " saliendo de partida: " + gameId);
             
-            // Remover de la partida según el tipo
+            String currentGameId = gameId;
+            
             if (esEspectador) {
-                server.removerEspectadorDePartida(gameId, this);
+                server.removerEspectadorDePartida(currentGameId, this);
             } else {
-                server.removerJugadorDePartida(gameId, this);
+                server.removerJugadorDePartida(currentGameId, this);
             }
             
             enPartida = false;
-            gameId = null;
             esEspectador = false;
             
-            // Enviar confirmación
             try {
                 String respuesta = String.format(
-                    "{\n" +
-                    "  \"response_type\": \"%s\",\n" +
-                    "  \"game_id\": \"%s\",\n" +
-                    "  \"timestamp\": %d,\n" +
-                    "  \"status\": \"SUCCESS\"\n" +
-                    "}", esEspectador ? "SPECTATOR_LEFT" : "GAME_LEFT", 
-                    gameId, System.currentTimeMillis());
+                    "{\"response_type\":\"%s\",\"game_id\":\"%s\",\"timestamp\":%d,\"status\":\"SUCCESS\"}",
+                    esEspectador ? "SPECTATOR_LEFT" : "GAME_LEFT", 
+                    currentGameId, System.currentTimeMillis());
                     
-                adapter.sendString(respuesta);
+                enviarMensajeSeguro(respuesta);
+                System.out.println("✅ Confirmación de salida enviada para partida: " + currentGameId);
             } catch (Exception e) {
                 System.out.println("Error enviando confirmación de salida: " + e.getMessage());
             }
+            
+            gameId = null;
         }
     }
 
-    // Envia mensaje de error al cliente
     private void enviarError(String errorCode, String mensaje) {
         try {
             String errorJson = String.format(
-                "{\n" +
-                "  \"response_type\": \"ERROR\",\n" +
-                "  \"timestamp\": %d,\n" +
-                "  \"error_code\": \"%s\",\n" +
-                "  \"message\": \"%s\"\n" +
-                "}", System.currentTimeMillis(), errorCode, mensaje);
+                "{\"response_type\":\"ERROR\",\"timestamp\":%d,\"error_code\":\"%s\",\"message\":\"%s\"}",
+                System.currentTimeMillis(), errorCode, mensaje);
                 
-            adapter.sendString(errorJson);
+            enviarMensajeSeguro(errorJson);
             System.out.println("Error enviado a cliente " + clientId + ": " + errorCode + " - " + mensaje);
         } catch (Exception e) {
             System.out.println("Error enviando mensaje de error: " + e.getMessage());
         }
     }
 
-    /**
-     * Procesa el JSON de input del cliente y actualiza:
-     * - currentInput (estado de teclas)
-     * - playerState (string para animación)
-     *
-     * JSON esperado:
-     * {
-     *   "input_type": "KEY_PRESSED" | "KEY_RELEASED",
-     *   "key": "LEFT" | "RIGHT" | "UP" | "DOWN" | "JUMP"
-     * }
-     */
+    // ==================== PROCESAMIENTO DE INPUT ====================
+
     private void procesarInput(String jsonInput) {
         try {
             String inputType = extraerValor(jsonInput, "input_type");
             String key = extraerValor(jsonInput, "key");
 
-            System.out.println("Procesando input: " + inputType + " - " + key);
+            System.out.println("🎮 Procesando input: " + inputType + " - " + key);
 
-            if (key.endsWith("_RELEASED")) {
-                String realKey = key.substring(0, key.length() - 9); // quitar "_RELEASED"
-                System.out.println("CORRECCIÓN: Convirtiendo '" + key + "' a KEY_RELEASED con key '" + realKey + "'");
-                inputType = "KEY_RELEASED";
-                key = realKey;
-            }
-            
-            if (key.endsWith("_PRESSED")) {
-                String realKey = key.substring(0, key.length() - 8); // quitar "_PRESSED"  
-                System.out.println("CORRECCIÓN: Convirtiendo '" + key + "' a KEY_PRESSED con key '" + realKey + "'");
-                inputType = "KEY_PRESSED";
-                key = realKey;
-            }
-            
-            // Validar que tenemos valores correctos
-            if (inputType.isEmpty() || key.isEmpty()) {
-                System.out.println("ERROR: InputType o Key están vacíos. JSON: " + jsonInput);
-                return;
-            }
-            
             boolean pressed = "KEY_PRESSED".equals(inputType);
 
             boolean left = currentInput.isLeft();
@@ -550,248 +555,142 @@ public class ClientHandler implements Runnable {
             switch (key) {
                 case "LEFT":
                     left = pressed;
-                    if (pressed) {
-                        playerState = "MOVING_LEFT";
-                    }
+                    if (pressed) playerState = "MOVING_LEFT";
+                    else if (!right) playerState = "STANDING";
                     break;
                 case "RIGHT":
                     right = pressed;
-                    if (pressed) {
-                        playerState = "MOVING_RIGHT";
-                    }
+                    if (pressed) playerState = "MOVING_RIGHT";
+                    else if (!left) playerState = "STANDING";
                     break;
                 case "UP":
                     up = pressed;
-                    if (pressed) {
-                        playerState = "CLIMBING";
-                    }
+                    if (pressed) playerState = "CLIMBING";
                     break;
                 case "DOWN":
                     down = pressed;
-                    if (pressed) {
-                        playerState = "FALLING";
-                    }
+                    if (pressed) playerState = "FALLING";
                     break;
                 case "JUMP":
                     jump = pressed;
-                    if (pressed) {
-                        playerState = "JUMPING";
-                    }
+                    if (pressed) playerState = "JUMPING";
                     break;
                 default:
-                    // Tecla desconocida, la ignoramos
+                    System.out.println("Tecla desconocida: " + key);
                     break;
             }
 
-            // Actualizamos el objeto PlayerInput que la lógica consumirá
+            if (!left && !right && !"CLIMBING".equals(playerState) && 
+                !"JUMPING".equals(playerState) && !"FALLING".equals(playerState)) {
+                playerState = "STANDING";
+            }
+
             currentInput = new PlayerInput(left, right, up, down, jump);
 
-            System.out.println("Input actualizado - L:" + left + " R:" + right + 
+            System.out.println("🔄 Input actualizado - L:" + left + " R:" + right + 
                         " U:" + up + " D:" + down + " J:" + jump + 
                         " State:" + playerState);
 
-
         } catch (Exception e) {
-            System.out.println("Error procesando input JSON: " + e.getMessage());
+            System.out.println("❌ Error procesando input JSON: " + e.getMessage());
             e.printStackTrace();
         }
     }
 
-    /**
-     * Extrae un valor string del JSON en formato "clave":"valor".
-     * Parser mínimo para este uso concreto.
-     */
-    private String extraerValor(String json, String clave) {
-        try {
-            // Buscar el patrón con la clave
-            String patron = "\"" + clave + "\":";
-            int inicio = json.indexOf(patron);
-            if (inicio == -1) {
-                System.out.println("DEBUG: No se encontró la clave '" + clave + "' en JSON: " + json);
-                return "";
-            }
-            
-            inicio += patron.length();
-            
-            // Buscar el inicio del valor (saltar espacios)
-            while (inicio < json.length() && Character.isWhitespace(json.charAt(inicio))) {
-                inicio++;
-            }
-            
-            if (inicio >= json.length()) {
-                return "";
-            }
-            
-            char primerChar = json.charAt(inicio);
-            
-            // Determinar si el valor es string (entre comillas) o otro tipo
-            if (primerChar == '"') {
-                // Valor es string entre comillas
-                inicio++; // saltar la comilla inicial
-                int fin = json.indexOf("\"", inicio);
-                if (fin == -1) {
-                    return "";
-                }
-                return json.substring(inicio, fin);
-            } else {
-                // Valor es número, bool, o cualquier cosa sin comillas
-                int fin = json.indexOf(",", inicio);
-                if (fin == -1) {
-                    fin = json.indexOf("}", inicio);
-                }
-                if (fin == -1) {
-                    fin = json.indexOf("\n", inicio); // también buscar fin de línea
-                }
-                if (fin == -1) {
-                    return json.substring(inicio).trim();
-                }
-                return json.substring(inicio, fin).trim();
-            }
-        } catch (Exception e) {
-            System.out.println("Error extrayendo valor '" + clave + "' de JSON: " + json);
-            e.printStackTrace();
-            return "";
-        }
-    }
+    // ==================== GENERACIÓN DE ESTADO ====================
 
-    /**
-     * Construye el JSON de estado leyendo DIRECTAMENTE desde GameLogic:
-     *
-     * {
-     *   "game_id": "...",
-     *   "timestamp": ...,
-     *   "game_active": true,
-     *   "changes": {
-     *     "player": {...},
-     *     "enemies": [...],
-     *     "fruits": [...]
-     *   }
-     * }
-     *
-     * NOTA: game_active se deja en true por ahora.
-     */
     private String generarEstadoJuego(GameLogic gameLogic) {
         StringBuilder json = new StringBuilder();
-
-        // Por ahora el juego se considera siempre activo
         boolean gameActive = true;
-
-        // --- Player desde lógica ---
         Player player = gameLogic.getPlayer();
-        float playerX = player.getX(); 
-        float playerY = player.getY();
 
         json.append("{\n");
-        json.append("  \"response_type\": \"GAME_STATE\",\n"); // ← AGREGAR response_type
+        json.append("  \"response_type\": \"GAME_STATE\",\n");
         json.append("  \"game_id\":\"").append(gameId).append("\",\n");
         json.append("  \"timestamp\":").append(System.currentTimeMillis()).append(",\n");
         json.append("  \"game_active\":").append(gameActive).append(",\n");
         json.append("  \"changes\":{\n");
         json.append("    \"player\":{\n");
-        json.append("      \"x\": ").append(playerX).append(",\n");
-        json.append("      \"y\": ").append(playerY).append(",\n");
+        json.append("      \"x\": ").append(player.getX()).append(",\n");
+        json.append("      \"y\": ").append(player.getY()).append(",\n");
         json.append("      \"state\":\"").append(playerState).append("\",\n");
         json.append("      \"lives\":").append(player.getLives()).append(",\n");
         json.append("      \"score\":").append(player.getScore()).append(",\n");
         json.append("      \"active\":").append(gameActive).append("\n");
         json.append("    },\n");
 
-        // --- Enemigos (cocodrilos) ---
         json.append("    \"enemies\":[\n");
         int enemyIndex = 0;
         for (Croc c : gameLogic.getCrocs()) {
             if (c != null && c.isAlive()) {
-                if (enemyIndex > 0) {
-                    json.append(",\n");
-                }
-                float ex = c.getX();
-                float ey = c.getY();
+                if (enemyIndex > 0) json.append(",\n");
                 String type = (c instanceof RedCroc) ? "RED_CROCODILE" : "BLUE_CROCODILE";
-
                 json.append("      {\n");
                 json.append("        \"id\":\"croc_").append(enemyIndex).append("\",\n");
                 json.append("        \"type\":\"").append(type).append("\",\n");
-                json.append("        \"x\":").append(ex).append(",\n");
-                json.append("        \"y\":").append(ey).append(",\n");
+                json.append("        \"x\":").append(c.getX()).append(",\n");
+                json.append("        \"y\":").append(c.getY()).append(",\n");
                 json.append("        \"active\":true\n");
                 json.append("      }");
-
                 enemyIndex++;
             }
         }
         json.append("\n    ],\n");
 
-        // --- Frutas ---
         json.append("    \"fruits\":[\n");
         int fruitIndex = 0;
         for (Fruit f : gameLogic.getFruits()) {
-            if (!f.isActive()) {
-                continue;
-            }
-            if (fruitIndex > 0) {
-                json.append(",\n");
-            }
-            float fx = f.getX();
-            float fy = f.getY();
-
+            if (!f.isActive()) continue;
+            if (fruitIndex > 0) json.append(",\n");
             json.append("      {\n");
             json.append("        \"id\":\"fruit_").append(fruitIndex).append("\",\n");
             json.append("        \"type\":\"BANANA\",\n");
             json.append("        \"points\":").append(f.getPoints()).append(",\n");
-            json.append("        \"x\":").append(fx).append(",\n");
-            json.append("        \"y\":").append(fy).append(",\n");
+            json.append("        \"x\":").append(f.getX()).append(",\n");
+            json.append("        \"y\":").append(f.getY()).append(",\n");
             json.append("        \"active\":true\n");
             json.append("      }");
-
             fruitIndex++;
         }
         json.append("\n    ]\n");
-
         json.append("  }\n");
         json.append("}");
 
-        String resultado = json.toString();
-        System.out.println("📤 JSON generado para partida " + gameId + ":");
-        System.out.println(resultado);
-
-        return resultado;
+        return json.toString();
     }
 
-    // =========================================================
-    //                   ESPECTADOR
-    // =========================================================
+    // ==================== UTILIDADES ====================
 
-    private void handleEspectador() throws IOException {
-        System.out.println("Espectador " + clientId + " observando");
-
-        // Ejemplo simple de protocolo con enteros
-        adapter.sendInt(200);
-
-        for (int i = 0; i < 10; i++) {
-            adapter.sendInt(i);
-            try {
-                Thread.sleep(1000);
-            } catch (InterruptedException e) {
-                System.out.println("Sleep interrumpido");
-                break;
+    private String extraerValor(String json, String clave) {
+        try {
+            String patron = "\"" + clave + "\":";
+            int inicio = json.indexOf(patron);
+            if (inicio == -1) return "";
+            
+            inicio += patron.length();
+            while (inicio < json.length() && Character.isWhitespace(json.charAt(inicio))) {
+                inicio++;
             }
-        }
-    }
-
-    // =========================================================
-    //                       ADMIN
-    // =========================================================
-
-    private void handleAdmin() throws IOException {
-        System.out.println("Admin " + clientId + " conectado");
-
-        adapter.sendInt(300);
-
-        // Ejemplo simple de eco de comandos
-        for (int i = 0; i < 3; i++) {
-            int comando = adapter.receiveInt();
-            System.out.println("Admin " + clientId + " envió comando: " + comando);
-            adapter.sendInt(comando + 1000);
+            
+            if (inicio >= json.length()) return "";
+            
+            char primerChar = json.charAt(inicio);
+            
+            if (primerChar == '"') {
+                inicio++;
+                int fin = json.indexOf("\"", inicio);
+                if (fin == -1) return "";
+                return json.substring(inicio, fin);
+            } else {
+                int fin = json.indexOf(",", inicio);
+                if (fin == -1) fin = json.indexOf("}", inicio);
+                if (fin == -1) fin = json.indexOf("\n", inicio);
+                if (fin == -1) return json.substring(inicio).trim();
+                return json.substring(inicio, fin).trim();
+            }
+        } catch (Exception e) {
+            System.out.println("Error extrayendo valor '" + clave + "'");
+            return "";
         }
     }
 

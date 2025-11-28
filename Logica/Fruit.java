@@ -6,6 +6,7 @@
  */
 public final class Fruit {
 
+    private final Integer id;
     private final Integer x;
     private final Integer y;
     private final Integer points;
@@ -18,15 +19,22 @@ public final class Fruit {
      * @param y      coordenada Y del centro de la fruta, en píxeles.
      * @param points puntos que otorga al ser recogida.
      */
-    public Fruit(final Integer x,
+    public Fruit(final Integer id,
+                 final Integer x,
                  final Integer y,
                  final Integer points) {
-        if (x == null || y == null || points == null) {
+        if (id == null || x == null || y == null || points == null) {
             throw new IllegalArgumentException("Fruit parameters must not be null");
         }
+        this.id = id;
         this.x = x;
         this.y = y;
         this.points = points;
+    }
+
+    
+    public Integer getId() {  // ← AGREGAR ESTE MÉTODO
+        return id;
     }
 
     /**

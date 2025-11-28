@@ -170,7 +170,7 @@ bool serializar_input_a_json(TipoCliente client_type, const char* game_id,
 
 bool enviar_input_al_servidor(TipoCliente client_type, const char* game_id,
                              const char* input_type, const char* key) {
-    if (!servidor_conectado || !partida_activa) {  //solo si la partida esta activa
+    if (!servidor_conectado || !partida_activa) {
         printf("Servidor no conectado o partida no activa, input ignorado: %s\n", key);
         return false;
     }
@@ -181,11 +181,20 @@ bool enviar_input_al_servidor(TipoCliente client_type, const char* game_id,
         return false;
     }
     
+    // Verificar que el tamaño sea razonable antes de enviar
+    if (paquete.json_size <= 0 || paquete.json_size > 10000) {
+        printf("❌ Tamaño de JSON inválido: %d\n", (int)paquete.json_size);
+        liberar_paquete_json(&paquete);
+        return false;
+    }
+    
     // Envia tamaño primero
-    adapter_send_int(socket_servidor, (int)paquete.json_size);
+    int size_to_send = (int)paquete.json_size;
+    printf("Enviando tamaño: %d\n", size_to_send);
+    adapter_send_int(socket_servidor, size_to_send);
     
     // Envia datos JSON
-    int bytes_sent = send(socket_servidor, paquete.json_data, (int)paquete.json_size, 0);
+    int bytes_sent = send(socket_servidor, paquete.json_data, size_to_send, 0);
     
     liberar_paquete_json(&paquete);
     
@@ -194,7 +203,7 @@ bool enviar_input_al_servidor(TipoCliente client_type, const char* game_id,
         return false;
     }
     
-    printf("Input enviado al servidor: %s - %s\n", input_type, key);
+    printf("Input enviado al servidor: %s - %s (%d bytes)\n", input_type, key, bytes_sent);
     return true;
 }
 // ==================== FUNCIONES DE HANDSHAKE ====================
@@ -305,15 +314,11 @@ bool procesar_respuesta_servidor(EstadoJuego *estado) {
     
     //Recibe tamaño del JSON
     int json_size;
-    if (adapter_receive_int(socket_servidor, &json_size) <= 0) {
-        printf("Error recibiendo tamaño del JSON\n");
-        return false;
-    }
-
-    printf("Tamaño del JSON recibido: %d bytes\n", json_size);
+    int result = adapter_receive_int(socket_servidor, &json_size);
     
-    if (json_size <= 0 || json_size > 100000) {
-        printf("Tamaño de JSON invalido: %d\n", json_size);
+    if (result <= 0) {
+        printf("Conexión perdida o error recibiendo tamaño del JSON\n");
+        servidor_conectado = false;
         return false;
     }
     
@@ -406,6 +411,21 @@ bool procesar_respuesta_servidor(EstadoJuego *estado) {
             free(response_type);
             free(json_buffer);
             return false;
+        }
+        else if (strcmp(response_type, "GAME_LEFT") == 0) {
+            printf("🎮 Partida terminada - desconectando...\n");
+            
+            // Extraer game_id de la respuesta para verificar
+            char* game_id_respuesta = extraer_string_json(json_buffer, "game_id");
+            if (game_id_respuesta) {
+                printf("Partida cerrada: %s\n", game_id_respuesta);
+                free(game_id_respuesta);
+            }
+            
+            set_partida_activa(false);
+            free(response_type);
+            free(json_buffer);
+            return true; // Cambiar a true para indicar que se procesó correctamente
         }
         else {
             printf("Respuesta no manejada: %s\n", response_type);
@@ -512,52 +532,51 @@ bool deserializar_json_a_estado(const char *json_data, EstadoJuego *estado) {
         return false;
     }
 
-    printf("JSON COMPLETO RECIBIDO:\n%s\n", json_data);
-    printf("Longitud del JSON: %zu caracteres\n", strlen(json_data));
-    
-    // 1. GAME ID y TIMESTAMP
-    char* game_id = extraer_string_json(json_data, "game_id");
-    if (game_id) {
-        printf("Partida: %s\n", game_id);
-        free(game_id);
+    // 1. Extraer datos del jugador directamente del JSON principal
+    // Buscar el objeto "player" dentro de "changes"
+    const char* player_start = strstr(json_data, "\"player\"");
+    if (!player_start) {
+        printf("❌ No se encontró objeto 'player' en JSON\n");
+        return false;
     }
     
-    // 2. PLAYER DATA
-    estado->jugador.x = extraer_float_json(json_data, "x");
-    estado->jugador.y = extraer_float_json(json_data, "y");
-    estado->jugador.vidas = extraer_int_json(json_data, "lives");
-    estado->jugador.puntuacion = extraer_int_json(json_data, "score");
-    estado->jugador.activo = extraer_bool_json(json_data, "active");
+    // Buscar el inicio del objeto player { ... }
+    player_start = strchr(player_start, '{');
+    if (!player_start) {
+        printf("❌ No se encontró inicio del objeto player\n");
+        return false;
+    }
     
-    // Estado del jugador desde JSON
-    char* estado_str = extraer_string_json(json_data, "state");
+    // Extraer datos del jugador desde el objeto player
+    estado->jugador.x = extraer_float_json(player_start, "x");
+    estado->jugador.y = extraer_float_json(player_start, "y");
+    estado->jugador.vidas = extraer_int_json(player_start, "lives");
+    estado->jugador.puntuacion = extraer_int_json(player_start, "score");
+    estado->jugador.activo = extraer_bool_json(player_start, "active");
+    
+    // Estado del jugador desde JSON - BUSCAR DENTRO DEL OBJETO PLAYER
+    char* estado_str = extraer_string_json(player_start, "state");
     if (estado_str) {
+        printf("🎯 Estado del jugador recibido: %s\n", estado_str);
         if (strcmp(estado_str, "CLIMBING") == 0) estado->jugador.estado = ESTADO_AGARRADO_LIANA;
         else if (strcmp(estado_str, "JUMPING") == 0) estado->jugador.estado = ESTADO_SALTANDO;
         else if (strcmp(estado_str, "FALLING") == 0) estado->jugador.estado = ESTADO_CAYENDO;
         else estado->jugador.estado = ESTADO_SUELO;
         free(estado_str);
+    } else {
+        printf("⚠️  No se pudo extraer estado del jugador\n");
+        estado->jugador.estado = ESTADO_SUELO;
     }
     
-    // 3. PADRE (Donkey Kong)
-    estado->padre.activo = true; // Siempre activo por ahora
+    // 2. PADRE (Donkey Kong) - por ahora siempre activo
+    estado->padre.activo = true;
     
-    // 4. JUEGO ACTIVO
+    // 3. JUEGO ACTIVO
     estado->juego_activo = extraer_bool_json(json_data, "game_active");
     
     printf("JSON deserializado - Jugador: (%.1f, %.1f), Vidas: %d, Puntos: %d, Estado: %d\n",
            estado->jugador.x, estado->jugador.y, estado->jugador.vidas, 
-           estado->jugador.puntuacion, estado->jugador.estado, 
-           estado->juego_activo ? "SI" : "NO");
-    
-    return true;
-
-        //AGREGAR AL FINAL - Debug de lo que se recibió
-    static int debug_count = 0;
-    if (debug_count++ % 10 == 0) { // Cada 10 updates
-        printf("GAME_STATE Recibido - Jugador: (%.1f, %.1f), Estado: %d\n",
-               estado->jugador.x, estado->jugador.y, estado->jugador.estado);
-    }
+           estado->jugador.puntuacion, estado->jugador.estado);
     
     return true;
 }
