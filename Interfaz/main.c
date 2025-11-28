@@ -20,7 +20,7 @@ int main(void) {
     EstadoJuego estado_juego;
     FrameInputs inputs_frame;
     
-    // Inicialización
+    // Inicializacion
     inicializar_graficos();
     inicializar_estado_default(&estado_juego);
     

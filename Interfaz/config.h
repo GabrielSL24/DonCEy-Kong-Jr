@@ -19,7 +19,7 @@
 #define PLATAFORMA_HEIGHT 20
 #define AGUA_HEIGHT 80
 
-// Colores
+// Colores, la mayoria son de implementacion antigua
 #define COLOR_FONDO BLACK
 #define COLOR_JUGADOR (Color){184, 134, 72, 255}
 #define COLOR_PADRE (Color){101, 67, 33, 255}
@@ -69,10 +69,10 @@
 // Sprites
 #define SPRITE_SIZE 32
 #define SPRITE_FONDO "assets/fondo.png"
-#define SPRITE_DKJ "assets/dkj.png"           // DK Jr - el personaje principal
-#define SPRITE_DKJ_STATIC "assets/dkj_s.png"  // DK Jr estático
-#define SPRITE_DK "assets/dk.png"             // Donkey Kong padre
-#define SPRITE_MARIO "assets/mario.png"       // Mario (enemigo?)
+#define SPRITE_DKJ "assets/dkj.png"           
+#define SPRITE_DKJ_STATIC "assets/dkj_s.png"  
+#define SPRITE_DK "assets/dk.png"             
+#define SPRITE_MARIO "assets/mario.png"       
 #define SPRITE_COCODRILO_ROJO "assets/cocorojo.png"
 #define SPRITE_COCODRILO_AZUL "assets/cocoazul.png"
 #define SPRITE_FRUTA_MANZANA "assets/manzana.png"
@@ -80,10 +80,10 @@
 #define SPRITE_FRUTA_PERAS "assets/peras.png"
 
 // Tamaños de sprites escalados
-#define SPRITE_JUGADOR_SIZE 32     // Tamaño visual del jugador
-#define SPRITE_PADRE_SIZE 40       // DK padre más grande
-#define SPRITE_COCODRILO_SIZE 28   // Cocodrilos
-#define SPRITE_FRUTA_SIZE 20       // Frutas
+#define SPRITE_JUGADOR_SIZE 32   
+#define SPRITE_PADRE_SIZE 40       
+#define SPRITE_COCODRILO_SIZE 28   
+#define SPRITE_FRUTA_SIZE 20       
 
 // Debug
 #define DEBUG_COLISIONES true

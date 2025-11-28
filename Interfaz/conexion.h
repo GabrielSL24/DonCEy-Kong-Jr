@@ -49,13 +49,13 @@ bool unirse_partida_espectador(const char* game_id);
 bool salir_partida_espectador(const char* game_id);
 bool parsear_lista_partidas(const char* json_str, InfoPartida partidas[], int* count);
 
-// ==================== FUNCIONES DE HANDSHAKE ====================
+// ==================== FUNCIONES DE IDENTIFICACION ==================== 
 bool esperar_respuesta_servidor(void);
 bool procesar_respuesta_servidor(EstadoJuego *estado);
 bool esta_en_partida_activa(void);
 void set_partida_activa(bool activa);
 
-// ==================== VARIABLE GLOBAL ====================
+// ==================== VARIABLES GLOBALES ====================
 extern bool servidor_conectado;
 extern InfoPartida partidas_disponibles[10];
 extern int cantidad_partidas;

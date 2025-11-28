@@ -3,7 +3,7 @@
 #include <stdio.h>
 #include <string.h>
 
-// ==================== DETECCIÓN DE CONTROLES ====================
+// ==================== DETECCION DE CONTROLES ====================
 
 void actualizar_controles(Controles *ctrl) {
     // Solo actualizar estado actual de las teclas
@@ -14,10 +14,10 @@ void actualizar_controles(Controles *ctrl) {
     ctrl->espacio = IsKeyDown(KEY_SPACE);
 }
 
-// ==================== DETECCIÓN DE INPUTS NUEVOS ====================
+// ==================== DETECCION DE INPUTS NUEVOS ====================
 
 bool hay_inputs_nuevos(const Controles *ctrl) {
-    // Verificar si alguna tecla fue presionada (no solo mantenida)
+    // Verifica si alguna tecla fue presionada o soltada este frame
     return IsKeyPressed(KEY_LEFT) || IsKeyPressed(KEY_RIGHT) || 
            IsKeyPressed(KEY_UP) || IsKeyPressed(KEY_DOWN) ||
            IsKeyPressed(KEY_SPACE);
