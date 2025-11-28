@@ -283,14 +283,14 @@ void dibujar_fondo(const SistemaSprites *sprites) {
 
 void dibujar_escena_completa(const EstadoJuego *estado, const SistemaSprites *sprites) {
     
-    // 1. Fondo (ahora desde sprites)
+    // 1. Fondo del nivel
     dibujar_fondo(sprites);
     
-    // 2. Elementos estáticos del juego
+    // 2. Elementos estaticos del juego
     dibujar_lianas(estado->lianas, estado->num_lianas);
     dibujar_plataformas(estado->plataformas, estado->num_plataformas);
     
-    // 3. Entidades dinámicas
+    // 3. Entidades dinamicas
     dibujar_padre(&estado->padre, sprites);
     
     for (int i = 0; i < estado->num_frutas; i++) {
@@ -301,13 +301,13 @@ void dibujar_escena_completa(const EstadoJuego *estado, const SistemaSprites *sp
         dibujar_cocodrilo(&estado->cocodrilos[i], sprites);
     }
     
-    // 4. Jugador (siempre encima)
+    // 4. Jugador
     dibujar_jugador(&estado->jugador, sprites);
     
     // 5. UI
     dibujar_ui(estado);
     
-    // 6. Debug (si está activado)
+    // 6. Debug (si esta activado)
     if (DEBUG_COLISIONES) {
         dibujar_debug_info(estado);
         dibujar_hitboxes(estado);
@@ -316,10 +316,10 @@ void dibujar_escena_completa(const EstadoJuego *estado, const SistemaSprites *sp
 }
 
 void dibujar_ui(const EstadoJuego *estado) {
-    // Título
+    // Titulo
     DrawText("Donkey Kong Jr", 10, 10, 20, WHITE);
     
-    // Vidas y puntuación
+    // Vidas y puntuacion
     DrawText(TextFormat("Vidas: %d", estado->jugador.vidas), SCREEN_WIDTH - 150, 10, 20, WHITE);
     DrawText(TextFormat("Puntos: %d", estado->jugador.puntuacion), SCREEN_WIDTH - 300, 10, 20, WHITE);
     
@@ -396,9 +396,7 @@ void dibujar_hitboxes(const EstadoJuego *estado) {
 }
 
 void dibujar_interfaz_menu(EstadoMenu estado, int seleccion, InfoPartida partidas[], int count, const char* partida_actual) {
-    // ESTA FUNCIÓN SOLO SE LLAMA DESDE ESTADOS DE MENÚ
-    // NO desde estados de juego
-    
+
     switch (estado) {
         case MENU_MAIN:
             dibujar_menu_principal(seleccion);
@@ -413,7 +411,7 @@ void dibujar_interfaz_menu(EstadoMenu estado, int seleccion, InfoPartida partida
             break;
             
         case MENU_SPECTATING:
-            // EL HUD del espectador se dibuja en dibujar_ui() dentro de dibujar_escena_completa()
+            // igual aca xd
             break;
     }
 }

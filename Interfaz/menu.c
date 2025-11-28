@@ -197,7 +197,7 @@ void dibujar_menu_principal(int seleccion) {
     }
     
     // Instrucciones
-    DrawText("Usa arriba o abajo para navegar, ENTER para seleccionar", centerX - 200, centerY + 100, 20, LIGHTGRAY);
+    DrawText("Usa flecha arriba o abajo para navegar, ENTER para seleccionar", centerX - 200, centerY + 100, 20, LIGHTGRAY);
 }
 
 void dibujar_seleccion_partida(int seleccion, InfoPartida partidas[], int count) {

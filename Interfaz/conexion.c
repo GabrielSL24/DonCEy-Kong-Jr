@@ -251,22 +251,22 @@ static char* extraer_string_json(const char *json, const char *clave) {
     
     inicio += strlen(patron);
 
-    // Saltar espacios, tabs, newlines después de los dos puntos
+    // Salta espacios, tabs, newlines despues de los dos puntos
     while (*inicio && (*inicio == ' ' || *inicio == '\t' || *inicio == '\n' || *inicio == '\r')) {
         inicio++;
     }
 
      if (*inicio == '\0') {
-        printf("No hay valor después de la clave '%s'\n", clave);
+        printf("No hay valor despues de la clave '%s'\n", clave);
         return NULL;
     }
 
     if (*inicio == '"') {
         // Valor entre comillas
-        inicio++; // saltar la comilla inicial
+        inicio++; // salta la comilla inicial
         const char *fin = strchr(inicio, '"');
         if (!fin) {
-            printf("No se encontró comilla de cierre para '%s'\n", clave);
+            printf("No se encontro comilla de cierre para '%s'\n", clave);
             return NULL;
         }
         
@@ -303,7 +303,7 @@ bool procesar_respuesta_servidor(EstadoJuego *estado) {
         return false;
     }
     
-    // Recibir tamaño del JSON
+    //Recibe tamaño del JSON
     int json_size;
     if (adapter_receive_int(socket_servidor, &json_size) <= 0) {
         printf("Error recibiendo tamaño del JSON\n");
@@ -313,11 +313,11 @@ bool procesar_respuesta_servidor(EstadoJuego *estado) {
     printf("Tamaño del JSON recibido: %d bytes\n", json_size);
     
     if (json_size <= 0 || json_size > 100000) {
-        printf("Tamaño de JSON inválido: %d\n", json_size);
+        printf("Tamaño de JSON invalido: %d\n", json_size);
         return false;
     }
     
-    // Recibir datos JSON
+    // Recibe datos JSON
     char* json_buffer = (char*)malloc(json_size + 1);
     if (!json_buffer) {
         printf("Error allocando memoria para JSON\n");
@@ -334,7 +334,7 @@ bool procesar_respuesta_servidor(EstadoJuego *estado) {
     json_buffer[json_size] = '\0';
     printf("Mensaje del servidor (%d bytes): %s\n", json_size, json_buffer);
     
-    // Determinar tipo de mensaje por response_type
+    //Determina tipo de mensaje por response_type
     char* response_type = extraer_string_json(json_buffer, "response_type");
     
     if (response_type) {
@@ -417,7 +417,7 @@ bool procesar_respuesta_servidor(EstadoJuego *estado) {
          printf("Mensaje sin response_type, mostrando JSON completo:\n%s\n", json_buffer);
         // Intentar ver si es un mensaje de error antiguo
         if (strstr(json_buffer, "error") != NULL || strstr(json_buffer, "ERROR") != NULL) {
-            printf("🔍 Parece ser un mensaje de error\n");
+            printf("Parece ser un mensaje de error\n");
         }
     }
     
@@ -464,14 +464,14 @@ static bool extraer_bool_json(const char *json, const char *clave) {
 
     const char *inicio = strstr(json, patron);
     if (!inicio) {
-        printf("❌ Clave '%s' no encontrada en JSON\n", clave);
-        // Vamos a mostrar el JSON completo para debug
-        printf("📄 JSON completo (primeros 500 chars):\n%.500s\n", json);
+        printf("Clave '%s' no encontrada en JSON\n", clave);
+        //Mostrando el JSON completo para debug
+        printf("JSON completo (primeros 500 chars):\n%.500s\n", json);
         return false;
     }
     
     inicio += strlen(patron);
-     printf("✅ Clave '%s' encontrada, valor empieza en: '%.50s'\n", clave, inicio);
+     printf("Clave '%s' encontrada, valor empieza en: '%.50s'\n", clave, inicio);
     
     //Buscar "true" o "false"
     if (strncmp(inicio, "true", 4) == 0) {
@@ -492,7 +492,7 @@ static bool extraer_bool_json(const char *json, const char *clave) {
     }
     
     // Mostrar exactamente qué hay después de la clave
-    printf("❌ Valor no reconocido para '%s'. Contenido: '", clave);
+    printf("Valor no reconocido para '%s'. Contenido: '", clave);
     for (int i = 0; i < 20 && inicio[i] != '\0' && inicio[i] != ',' && inicio[i] != '}'; i++) {
         printf("%c", inicio[i]);
     }
@@ -505,20 +505,20 @@ static bool extraer_bool_json(const char *json, const char *clave) {
 // ==================== DESERIALIZACIÓN JSON COMPLETA ====================
 
 bool deserializar_json_a_estado(const char *json_data, EstadoJuego *estado) {
-    printf("🔧 Deserializando JSON del servidor...\n");
+    printf("Deserializando JSON del servidor...\n");
     
     if (!json_data || strlen(json_data) == 0) {
-        printf("❌ JSON vacío o nulo\n");
+        printf("JSON vacío o nulo\n");
         return false;
     }
 
-    printf("📄 JSON COMPLETO RECIBIDO:\n%s\n", json_data);
-    printf("📏 Longitud del JSON: %zu caracteres\n", strlen(json_data));
+    printf("JSON COMPLETO RECIBIDO:\n%s\n", json_data);
+    printf("Longitud del JSON: %zu caracteres\n", strlen(json_data));
     
-    // 1. GAME ID y TIMESTAMP (información general)
+    // 1. GAME ID y TIMESTAMP
     char* game_id = extraer_string_json(json_data, "game_id");
     if (game_id) {
-        printf("🎮 Partida: %s\n", game_id);
+        printf("Partida: %s\n", game_id);
         free(game_id);
     }
     
@@ -545,17 +545,17 @@ bool deserializar_json_a_estado(const char *json_data, EstadoJuego *estado) {
     // 4. JUEGO ACTIVO
     estado->juego_activo = extraer_bool_json(json_data, "game_active");
     
-    printf("✅ JSON deserializado - Jugador: (%.1f, %.1f), Vidas: %d, Puntos: %d, Estado: %d\n",
+    printf("JSON deserializado - Jugador: (%.1f, %.1f), Vidas: %d, Puntos: %d, Estado: %d\n",
            estado->jugador.x, estado->jugador.y, estado->jugador.vidas, 
            estado->jugador.puntuacion, estado->jugador.estado, 
            estado->juego_activo ? "SI" : "NO");
     
     return true;
 
-        // ✅ AGREGAR AL FINAL - Debug de lo que se recibió
+        //AGREGAR AL FINAL - Debug de lo que se recibió
     static int debug_count = 0;
     if (debug_count++ % 10 == 0) { // Cada 10 updates
-        printf("🔄 GAME_STATE Recibido - Jugador: (%.1f, %.1f), Estado: %d\n",
+        printf("GAME_STATE Recibido - Jugador: (%.1f, %.1f), Estado: %d\n",
                estado->jugador.x, estado->jugador.y, estado->jugador.estado);
     }
     
@@ -613,7 +613,7 @@ void liberar_paquete_json(PaqueteJSON *paquete) {
 
 bool enviar_solicitud_espectador(TipoRequest request_type, const char* game_id) {
     if (!servidor_conectado) {
-        printf("⚠️  Servidor no conectado\n");
+        printf("Servidor no conectado\n");
         return false;
     }
     
@@ -640,7 +640,7 @@ bool enviar_solicitud_espectador(TipoRequest request_type, const char* game_id) 
         "}",
         request_type_str, game_id ? game_id : "", (long long)timestamp);
     
-    printf("📤 JSON Espectador: %s\n", json_data);
+    printf("JSON Espectador: %s\n", json_data);
     
     // Enviar tamaño primero
     adapter_send_int(socket_servidor, (int)strlen(json_data));
@@ -651,11 +651,11 @@ bool enviar_solicitud_espectador(TipoRequest request_type, const char* game_id) 
     free(json_data);
     
     if (bytes_sent == SOCKET_ERROR) {
-        printf("❌ Error enviando solicitud de espectador\n");
+        printf("Error enviando solicitud de espectador\n");
         return false;
     }
     
-    printf("✅ Solicitud de espectador enviada: %s\n", request_type_str);
+    printf("Solicitud de espectador enviada: %s\n", request_type_str);
     return true;
 }
 
@@ -674,12 +674,12 @@ bool salir_partida_espectador(const char* game_id) {
 }
 
 bool parsear_lista_partidas(const char* json_str, InfoPartida partidas[], int* count) {
-    printf("🔧 Parseando lista de partidas...\n");
+    printf("Parseando lista de partidas...\n");
     
     // Buscar el array de games
     const char* games_start = strstr(json_str, "\"games\"");
     if (!games_start) {
-        printf("❌ No se encontró array de games en JSON\n");
+        printf("No se encontro array de games en JSON\n");
         return false;
     }
     
@@ -691,13 +691,13 @@ bool parsear_lista_partidas(const char* json_str, InfoPartida partidas[], int* c
     const char* current = games_start;
     
     while (*current && *current != ']' && partida_count < 10) {
-        // Buscar cada objeto de partida entre { }
+        //Busca cada objeto de partida entre { }
         const char* obj_start = strchr(current, '{');
         const char* obj_end = strchr(current, '}');
         
         if (!obj_start || !obj_end || obj_start > obj_end) break;
         
-        // Extraer game_id
+        //Extrae game_id
         const char* id_start = strstr(obj_start, "\"game_id\"");
         if (id_start && id_start < obj_end) {
             id_start = strchr(id_start, '"');
@@ -709,21 +709,21 @@ bool parsear_lista_partidas(const char* json_str, InfoPartida partidas[], int* c
             }
         }
         
-        // Extraer player_count
+        // Extrae player_count
         const char* players_start = strstr(obj_start, "\"player_count\"");
         if (players_start && players_start < obj_end) {
             players_start = strchr(players_start, ':');
             if (players_start) partidas[partida_count].player_count = atoi(players_start + 1);
         }
         
-        // Extraer spectators  
+        // Extrae spectators  
         const char* specs_start = strstr(obj_start, "\"spectators\"");
         if (specs_start && specs_start < obj_end) {
             specs_start = strchr(specs_start, ':');
             if (specs_start) partidas[partida_count].spectators = atoi(specs_start + 1);
         }
         
-        // Extraer active
+        // Extrae active
         const char* active_start = strstr(obj_start, "\"active\"");
         if (active_start && active_start < obj_end) {
             active_start = strchr(active_start, ':');
@@ -733,7 +733,7 @@ bool parsear_lista_partidas(const char* json_str, InfoPartida partidas[], int* c
             }
         }
         
-        printf("🎮 Partida %d: %s (J:%d, E:%d, A:%s)\n",
+        printf("Partida %d: %s (J:%d, E:%d, A:%s)\n",
                partida_count, partidas[partida_count].game_id,
                partidas[partida_count].player_count,
                partidas[partida_count].spectators,
@@ -765,7 +765,7 @@ bool crear_nueva_partida(const char* game_id) {
         "}",
         game_id, (long long)timestamp);
     
-    printf("📤 Creando nueva partida: %s\n", json_data);
+    printf("Creando nueva partida: %s\n", json_data);
     
     // Enviar tamaño primero
     adapter_send_int(socket_servidor, (int)strlen(json_data));
@@ -776,11 +776,11 @@ bool crear_nueva_partida(const char* game_id) {
     free(json_data);
     
     if (bytes_sent == SOCKET_ERROR) {
-        printf("❌ Error creando partida\n");
+        printf("Error creando partida\n");
         return false;
     }
     
-    printf("✅ Partida creada: %s\n", game_id);
+    printf("Partida creada: %s\n", game_id);
     return true;
 }
 
@@ -802,22 +802,22 @@ bool unirse_partida_jugador(const char* game_id) {
         "}",
         game_id, (long long)timestamp);
     
-    printf("📤 Uniéndose a partida como jugador: %s\n", json_data);
+    printf("Uniéndose a partida como jugador: %s\n", json_data);
     
-    // Enviar tamaño primero
+    // Envia tamaño primero
     adapter_send_int(socket_servidor, (int)strlen(json_data));
     
-    // Enviar datos JSON
+    // Envia datos JSON
     int bytes_sent = send(socket_servidor, json_data, (int)strlen(json_data), 0);
     
     free(json_data);
     
     if (bytes_sent == SOCKET_ERROR) {
-        printf("❌ Error uniéndose a partida\n");
+        printf("Error uniendose a partida\n");
         return false;
     }
     
-    printf("✅ Unido a partida como jugador: %s\n", game_id);
+    printf("Unido a partida como jugador: %s\n", game_id);
     return true;
 }
 
@@ -839,27 +839,27 @@ bool salir_partida_jugador(const char* game_id) {
         "}",
         game_id, (long long)timestamp);
     
-    printf("📤 Saliendo de partida como jugador: %s\n", json_data);
+    printf("Saliendo de partida como jugador: %s\n", json_data);
     
-    // Enviar tamaño primero
+    // Envia tamaño primero
     adapter_send_int(socket_servidor, (int)strlen(json_data));
     
-    // Enviar datos JSON
+    // Envia datos JSON
     int bytes_sent = send(socket_servidor, json_data, (int)strlen(json_data), 0);
     
     free(json_data);
     
     if (bytes_sent == SOCKET_ERROR) {
-        printf("❌ Error saliendo de partida\n");
+        printf("Error saliendo de partida\n");
         return false;
     }
     
-    printf("✅ Salido de partida como jugador: %s\n", game_id);
+    printf("Salido de partida como jugador: %s\n", game_id);
     return true;
 }
 
 bool solicitar_actualizacion_lista_partidas(void) {
-    return solicitar_lista_partidas();  // Alias por ahora
+    return solicitar_lista_partidas();  //implementacion temporal
 }
 
 bool hay_datos_disponibles(void) {

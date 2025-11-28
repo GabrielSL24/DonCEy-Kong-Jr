@@ -25,7 +25,7 @@ typedef struct {
 // Declarar la variable global
 extern SistemaSprites sprites_global;
 
-// ==================== FUNCIONES DE INICIALIZACIÓN ====================
+// ==================== FUNCIONES DE INICIALIZACION ====================
 void inicializar_graficos(void);
 void cerrar_graficos(void);
 void cargar_sprites(SistemaSprites *sprites);
