@@ -25,7 +25,7 @@ public class Admin {
             MostrarGUI();
             actualizarListaPartidas();
         });
-    };
+    }
 
     private void MostrarGUI() {
         JFrame frame = new JFrame("Admin Panel - Control del Servidor");
@@ -45,7 +45,7 @@ public class Admin {
         panelPartida.setBorder(BorderFactory.createTitledBorder("Seleccionar Partida"));
 
         comboPartidas = new JComboBox<>();
-        comboPartidas.setPreferredSize(new Dimension());
+        comboPartidas.setPreferredSize(new Dimension(300, 25));
         panelPartida.add(new JLabel("Partida: "));
         panelPartida.add(comboPartidas);
         panelPartida.add(buttonActualizar);
@@ -60,14 +60,14 @@ public class Admin {
         panelLianas.add(new JLabel("Liana: "));
         panelLianas.add(comboLianas);
 
-        //Panel de configuacion de frutas
+        // Panel de configuracion de frutas
         JPanel panelFrutas = new JPanel(new GridLayout(2, 2, 5, 5));
         panelFrutas.setBorder(BorderFactory.createTitledBorder("Configuración de Frutas"));
         panelFrutas.add(new JLabel("Puntos:"));
         txtPuntosFruta = new JTextField("100");
         panelFrutas.add(txtPuntosFruta);
-        panelFrutas.add(new JLabel("Altura (Y):"));
-        txtAlturaFruta = new JTextField("300");
+        panelFrutas.add(new JLabel("Altura (offsetY):"));
+        txtAlturaFruta = new JTextField("100");
         panelFrutas.add(txtAlturaFruta);
 
         // Panel de clientes
@@ -107,11 +107,8 @@ public class Admin {
 
         // Layout principal
         JPanel panelMain = new JPanel(new BorderLayout());
-
-        // Panel superior con botones
         panelMain.add(panelControles, BorderLayout.NORTH);
         
-        // Panel central dividido
         JSplitPane splitPane = new JSplitPane(JSplitPane.HORIZONTAL_SPLIT, scrollClients, scrollLog);
         splitPane.setResizeWeight(0.3);
 
@@ -163,31 +160,32 @@ public class Admin {
         }
 
         try {
+            // Extraer el ID de la liana (0-8)
             int idLiana = Integer.parseInt(lianaSeleccionada.split(" ")[1]);
             int puntos = Integer.parseInt(txtPuntosFruta.getText());
-            int altura = Integer.parseInt(txtAlturaFruta.getText());
+            int offsetY = Integer.parseInt(txtAlturaFruta.getText());
             
             String gameId = partidasMap.get(partidaSeleccionada);
             SocketServidor.Partida partida = server.obtenerPartida(gameId);
             
             if (partida != null && partida.logica != null) {
-                // Obtener la posición X de la liana seleccionada
-                int xLiana = obtenerPosicionLiana(idLiana);
-                boolean exito = partida.logica.adminSpawnFruitOnVine(xLiana, altura, puntos);
+                // CORREGIDO: Usar directamente el ID de la liana (0-8)
+                boolean exito = partida.logica.adminSpawnFruitOnVine(idLiana, offsetY, puntos);
                 
                 if (exito) {
-                    areaLog.append(String.format("✅ Fruta creada en Liana %d, altura %d, %d puntos\n", 
-                        idLiana, altura, puntos));
+                    areaLog.append(String.format("✅ Fruta creada en Liana %d, offsetY %d, %d puntos\n", 
+                        idLiana, offsetY, puntos));
                 } else {
-                    areaLog.append("Error creando fruta\n");
+                    areaLog.append(String.format("❌ Error creando fruta en Liana %d (offsetY fuera de rango o liana no existe)\n", idLiana));
                 }
             } else {
-                areaLog.append("Partida no encontrada o lógica no disponible\n");
+                areaLog.append("❌ Partida no encontrada o lógica no disponible\n");
             }
         } catch (NumberFormatException ex) {
             JOptionPane.showMessageDialog(null, "Ingrese valores numéricos válidos para puntos y altura");
         } catch (Exception ex) {
             areaLog.append("Error creando fruta: " + ex.getMessage() + "\n");
+            ex.printStackTrace();
         }
     }
 
@@ -205,6 +203,7 @@ public class Admin {
         }
 
         try {
+            // Extraer el ID de la liana (0-8)
             int idLiana = Integer.parseInt(lianaSeleccionada.split(" ")[1]);
             String gameId = partidasMap.get(partidaSeleccionada);
             SocketServidor.Partida partida = server.obtenerPartida(gameId);
@@ -219,15 +218,16 @@ public class Admin {
                 }
                 
                 if (exito) {
-                    areaLog.append(String.format("Cocodrilo %s creado en Liana %d\n", tipo, idLiana));
+                    areaLog.append(String.format("✅ Cocodrilo %s creado en Liana %d\n", tipo, idLiana));
                 } else {
-                    areaLog.append(String.format("Error creando cocodrilo %s en Liana %d\n", tipo, idLiana));
+                    areaLog.append(String.format("❌ Error creando cocodrilo %s en Liana %d (ya existe un cocodrilo vivo en esa liana)\n", tipo, idLiana));
                 }
             } else {
-                areaLog.append("Partida no encontrada o lógica no disponible\n");
+                areaLog.append("❌ Partida no encontrada o lógica no disponible\n");
             }
         } catch (Exception ex) {
             areaLog.append("Error creando cocodrilo: " + ex.getMessage() + "\n");
+            ex.printStackTrace();
         }
     }
 
@@ -245,58 +245,43 @@ public class Admin {
         }
 
         try {
+            // Extraer el ID de la liana (0-8)
             int idLiana = Integer.parseInt(lianaSeleccionada.split(" ")[1]);
-            int altura = Integer.parseInt(txtAlturaFruta.getText());
+            int offsetY = Integer.parseInt(txtAlturaFruta.getText());
             
             String gameId = partidasMap.get(partidaSeleccionada);
             SocketServidor.Partida partida = server.obtenerPartida(gameId);
             
             if (partida != null && partida.logica != null) {
-                // Obtener la posición X de la liana seleccionada
-                int xLiana = obtenerPosicionLiana(idLiana);
-                Integer fruitId = partida.logica.buscarIdFruta(xLiana, altura);
+                // CORREGIDO: Usar directamente el ID de la liana
+                Integer fruitId = partida.logica.buscarIdFruta(idLiana, offsetY);
                 boolean exito = false;
+                
                 if (fruitId != null) {
                     exito = partida.logica.adminRemoveFruit(fruitId);
                 }
                 
                 if (exito) {
-                    areaLog.append(String.format("Fruta eliminada de Liana %d, altura %d\n", 
-                        idLiana, altura));
+                    areaLog.append(String.format("✅ Fruta eliminada de Liana %d, offsetY %d\n", 
+                        idLiana, offsetY));
                 } else {
-                    areaLog.append("No se encontró fruta en esa posición\n");
+                    areaLog.append(String.format("❌ No se encontró fruta activa en Liana %d, offsetY %d\n", 
+                        idLiana, offsetY));
                 }
             } else {
-                areaLog.append("Partida no encontrada o lógica no disponible\n");
+                areaLog.append("❌ Partida no encontrada o lógica no disponible\n");
             }
         } catch (NumberFormatException ex) {
             JOptionPane.showMessageDialog(null, "Ingrese una altura numérica válida");
         } catch (Exception ex) {
             areaLog.append("Error eliminando fruta: " + ex.getMessage() + "\n");
+            ex.printStackTrace();
         }
     }
 
-    private int obtenerPosicionLiana(int idLiana) {
-        // Mapear ID de liana a posición X (basado en GameConfig.createVines())
-        switch (idLiana) {
-            case 0: return 40;
-            case 1: return 110;
-            case 2: return 200;
-            case 3: return 320;
-            case 4: return 450;
-            case 5: return 520;
-            case 6: return 580;
-            case 7: return 680;
-            case 8: return 750;
-            default: return 100;
-        }
-    }
-
-
-    //Metodo para agregar/remover clientes al panel
+    // Método para agregar/remover clientes al panel
     public void addClient(int clientId, String ip, String estado) {
         SwingUtilities.invokeLater(() -> {
-            // Si es el primer cliente, removemos el label de "No hay clientes"
             if (panelClients.getComponentCount() == 1 &&
                 panelClients.getComponent(0) instanceof JLabel &&
                 ((JLabel) panelClients.getComponent(0)).getText().equals("No hay clientes conectados")) {
@@ -308,7 +293,6 @@ public class Admin {
             panelClients.add(labelClient);
             labelsClientes.put(clientId, labelClient);
 
-            // Actualizar la interfaz
             panelClients.revalidate();
             panelClients.repaint();
 
@@ -322,12 +306,10 @@ public class Admin {
             if (label != null) {
                 panelClients.remove(label);
 
-                // Si no hay más clientes, mostramos el mensaje
                 if (panelClients.getComponentCount() == 0) {
                     panelClients.add(new JLabel("No hay clientes conectados"));
                 }
 
-                // Actualizar la interfaz
                 panelClients.revalidate();
                 panelClients.repaint();
 

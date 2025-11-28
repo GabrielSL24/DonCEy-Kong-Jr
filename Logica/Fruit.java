@@ -5,7 +5,6 @@
  * al ser recogida y luego pasa a estado inactivo.
  */
 public final class Fruit {
-
     private final Integer id;
     private final Integer x;
     private final Integer y;
@@ -15,6 +14,7 @@ public final class Fruit {
     /**
      * Crea una fruta.
      *
+     * @param id     identificador único de la fruta.
      * @param x      coordenada X del centro de la fruta, en píxeles.
      * @param y      coordenada Y del centro de la fruta, en píxeles.
      * @param points puntos que otorga al ser recogida.
@@ -32,8 +32,10 @@ public final class Fruit {
         this.points = points;
     }
 
-    
-    public Integer getId() {  // ← AGREGAR ESTE MÉTODO
+    /**
+     * @return identificador único de la fruta.
+     */
+    public Integer getId() {
         return id;
     }
 
