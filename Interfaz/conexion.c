@@ -242,91 +242,186 @@ bool confirmar_inicio_partida(const char* game_id) {
 // Función auxiliar para extraer valores string del JSON
 static char* extraer_string_json(const char *json, const char *clave) {
     char patron[100];
-    snprintf(patron, sizeof(patron), "\"%s\":\"", clave);
+    snprintf(patron, sizeof(patron), "\"%s\":", clave);
+
+    printf("Buscando clave '%s' con patrón: '%s'\n", clave, patron);
     
     const char *inicio = strstr(json, patron);
-    if (!inicio) return NULL;
+    if (!inicio) {
+        printf("Clave '%s' no encontrada en JSON\n", clave);
+        return NULL;
+    }
     
     inicio += strlen(patron);
-    const char *fin = strchr(inicio, '"');
-    if (!fin) return NULL;
-    
-    size_t longitud = fin - inicio;
-    char *resultado = (char*)malloc(longitud + 1);
-    strncpy(resultado, inicio, longitud);
-    resultado[longitud] = '\0';
-    
-    return resultado;
+
+    // Saltar espacios, tabs, newlines después de los dos puntos
+    while (*inicio && (*inicio == ' ' || *inicio == '\t' || *inicio == '\n' || *inicio == '\r')) {
+        inicio++;
+    }
+
+     if (*inicio == '\0') {
+        printf("No hay valor después de la clave '%s'\n", clave);
+        return NULL;
+    }
+
+    if (*inicio == '"') {
+        // Valor entre comillas
+        inicio++; // saltar la comilla inicial
+        const char *fin = strchr(inicio, '"');
+        if (!fin) {
+            printf("No se encontró comilla de cierre para '%s'\n", clave);
+            return NULL;
+        }
+        
+        size_t longitud = fin - inicio;
+        char *resultado = (char*)malloc(longitud + 1);
+        if (!resultado) return NULL;
+        
+        strncpy(resultado, inicio, longitud);
+        resultado[longitud] = '\0';
+        
+        printf("Clave '%s' encontrada: '%s'\n", clave, resultado);
+        return resultado;
+    } else {
+        // Valor sin comillas (boolean, number, etc.)
+        const char *fin = inicio;
+        while (*fin && *fin != ',' && *fin != '}' && *fin != ' ' && *fin != '\t' && *fin != '\n' && *fin != '\r') {
+            fin++;
+        }
+        
+        size_t longitud = fin - inicio;
+        char *resultado = (char*)malloc(longitud + 1);
+        if (!resultado) return NULL;
+        
+        strncpy(resultado, inicio, longitud);
+        resultado[longitud] = '\0';
+        
+        printf("Clave '%s' encontrada: '%s'\n", clave, resultado);
+        return resultado;
+    }
 }
 
 bool procesar_respuesta_servidor(EstadoJuego *estado) {
-    if (!servidor_conectado) return false;
+    if (!servidor_conectado || !hay_datos_disponibles()) {
+        return false;
+    }
     
     // Recibir tamaño del JSON
     int json_size;
     if (adapter_receive_int(socket_servidor, &json_size) <= 0) {
+        printf("Error recibiendo tamaño del JSON\n");
+        return false;
+    }
+
+    printf("Tamaño del JSON recibido: %d bytes\n", json_size);
+    
+    if (json_size <= 0 || json_size > 100000) {
+        printf("Tamaño de JSON inválido: %d\n", json_size);
         return false;
     }
     
-    if (json_size <= 0 || json_size > 100000) return false;
-    
     // Recibir datos JSON
     char* json_buffer = (char*)malloc(json_size + 1);
-    if (!json_buffer) return false;
+    if (!json_buffer) {
+        printf("Error allocando memoria para JSON\n");
+        return false;
+    }
     
     int bytes_received = recv(socket_servidor, json_buffer, json_size, 0);
     if (bytes_received != json_size) {
+         printf("Error recibiendo datos JSON: esperados %d, recibidos %d\n", json_size, bytes_received);
         free(json_buffer);
         return false;
     }
     
     json_buffer[json_size] = '\0';
-    printf("📥 Mensaje del servidor (%d bytes): %s\n", json_size, json_buffer);
+    printf("Mensaje del servidor (%d bytes): %s\n", json_size, json_buffer);
     
     // Determinar tipo de mensaje por response_type
-    const char* response_type = extraer_string_json(json_buffer, "response_type");
+    char* response_type = extraer_string_json(json_buffer, "response_type");
     
     if (response_type) {
-        printf("🔍 Tipo de respuesta: %s\n", response_type);
+        printf("Tipo de respuesta: %s\n", response_type);
         
         if (strcmp(response_type, "GAME_LIST") == 0) {
-            printf("📋 Procesando lista de partidas...\n");
+            printf("Procesando lista de partidas...\n");
             bool resultado = parsear_lista_partidas(json_buffer, partidas_disponibles, &cantidad_partidas);
             free((void*)response_type);
             free(json_buffer);
             return resultado;
         }
-        else if (strcmp(response_type, "GAME_CREATED") == 0 ||
-                 strcmp(response_type, "GAME_JOINED") == 0 ||
-                 strcmp(response_type, "GAME_STARTED") == 0 ||
-                 strcmp(response_type, "SPECTATOR_JOINED") == 0) {
-            printf("✅ Partida confirmada por servidor: %s\n", response_type);
-            set_partida_activa(true); // ← ACTIVAR PARTIDA SOLO AQUÍ
-            free((void*)response_type);
+        else if (strcmp(response_type, "GAME_CREATED") == 0) {
+            printf("Partida creada confirmada por servidor\n");
+            
+            // Extraer game_id de la respuesta
+            char* game_id_respuesta = extraer_string_json(json_buffer, "game_id");
+            if (game_id_respuesta) {
+                strcpy(partida_seleccionada_global, game_id_respuesta);
+                free(game_id_respuesta);
+            }
+            
+            set_partida_activa(true);
+            free(response_type);
+            free(json_buffer);
+            return true;
+        }
+        else if (strcmp(response_type, "GAME_JOINED") == 0) {
+            printf("Unido a partida confirmado por servidor\n");
+            set_partida_activa(true);
+            free(response_type);
+            free(json_buffer);
+            return true;
+        }
+        else if (strcmp(response_type, "GAME_STARTED") == 0) {
+            printf("Partida iniciada confirmada por servidor\n");
+            set_partida_activa(true);
+            free(response_type);
+            free(json_buffer);
+            return true;
+        }
+        else if (strcmp(response_type, "SPECTATOR_JOINED") == 0) {
+            printf("Espectador unido confirmado por servidor\n");
+            set_partida_activa(true);
+            free(response_type);
             free(json_buffer);
             return true;
         }
         else if (strcmp(response_type, "GAME_STATE") == 0) {
-            // Solo procesar estado del juego si la partida está activa
             if (partida_activa) {
-                printf("🎮 Procesando estado del juego...\n");
+                printf("Procesando estado del juego...\n");
                 bool resultado = deserializar_json_a_estado(json_buffer, estado);
-                free((void*)response_type);
+                free(response_type);
                 free(json_buffer);
                 return resultado;
             } else {
-                printf("⚠️  Ignorando GAME_STATE - partida no activa\n");
-                free((void*)response_type);
+                printf("Ignorando GAME_STATE - partida no activa\n");
+                free(response_type);
                 free(json_buffer);
                 return false;
             }
         }
+        else if (strcmp(response_type, "ERROR") == 0) {
+            char* error_code = extraer_string_json(json_buffer, "error_code");
+            char* error_msg = extraer_string_json(json_buffer, "message");
+            printf("Error del servidor: %s - %s\n", error_code ? error_code : "UNKNOWN", error_msg ? error_msg : "No message");
+            if (error_code) free(error_code);
+            if (error_msg) free(error_msg);
+            free(response_type);
+            free(json_buffer);
+            return false;
+        }
         else {
-            printf("❓ Respuesta no manejada: %s\n", response_type);
-            free((void*)response_type);
+            printf("Respuesta no manejada: %s\n", response_type);
+            free(response_type);
+            free(json_buffer);
+            return false;
         }
     } else {
-        printf("⚠️  Mensaje sin response_type, ignorando\n");
+         printf("Mensaje sin response_type, mostrando JSON completo:\n%s\n", json_buffer);
+        // Intentar ver si es un mensaje de error antiguo
+        if (strstr(json_buffer, "error") != NULL || strstr(json_buffer, "ERROR") != NULL) {
+            printf("🔍 Parece ser un mensaje de error\n");
+        }
     }
     
     free(json_buffer);
@@ -759,4 +854,20 @@ bool salir_partida_jugador(const char* game_id) {
 
 bool solicitar_actualizacion_lista_partidas(void) {
     return solicitar_lista_partidas();  // Alias por ahora
+}
+
+bool hay_datos_disponibles(void) {
+    if (!servidor_conectado) return false;
+    
+    fd_set readfds;
+    struct timeval timeout;
+    
+    FD_ZERO(&readfds);
+    FD_SET(socket_servidor, &readfds);
+    
+    timeout.tv_sec = 0;
+    timeout.tv_usec = 0;
+    
+    int result = select(0, &readfds, NULL, NULL, &timeout);
+    return result > 0 && FD_ISSET(socket_servidor, &readfds);
 }

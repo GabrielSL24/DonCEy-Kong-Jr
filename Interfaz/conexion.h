@@ -12,6 +12,8 @@ typedef struct {
 } PaqueteJSON;
 
 
+bool hay_datos_disponibles(void);
+
 // ==================== FUNCIONES DE CONEXIÓN ====================
 bool conectar_servidor(const char* ip);
 void desconectar_servidor(void);
