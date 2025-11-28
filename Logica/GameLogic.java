@@ -269,6 +269,30 @@ public final class GameLogic {
         fruits.clear();
     }
 
+    public Integer buscarIdFruta(final Integer vineId, final Integer offsetY) {
+        if (vineId == null || offsetY == null) {
+            return null;
+        }
+        
+        final Vine vine = findVine(vineId);
+        if (vine == null) {
+            return null;
+        }
+        
+        final int targetX = vine.getCenterX();
+        final int targetY = vine.getYTop() + offsetY;
+        
+        for (Fruit fruit : fruits) {
+            if (fruit != null && fruit.isActive() && 
+                fruit.getX().equals(targetX) && 
+                fruit.getY().equals(targetY)) {
+                return fruit.getId();
+            }
+        }
+        
+        return null;
+    }
+
     // ==================== HELPERS PRIVADOS ====================
 
     /**

@@ -14,8 +14,13 @@ public class AdapterJ {
         this.output = new DataOutputStream(socket.getOutputStream());
     }
 
-    public boolean hayDatosDisponibles() throws IOException {
-        return input.available() > 0;
+    public boolean hayDatosDisponibles() {
+        try {
+            return input.available() > 0;
+        } catch (IOException e) {
+            System.out.println("Error verificando datos disponibles: " + e.getMessage());
+            return false;
+        }
     }
 
     public void sendInt(int value) throws IOException {
@@ -39,16 +44,34 @@ public class AdapterJ {
     }
 
     public String receiveString() throws IOException {
-        int length = input.readInt();
-        if (length <= 0 || length > 10000) {
-            throw new IOException("Tamaño de string invalido: " + length);
+        try {
+            int length = input.readInt();
+            System.out.println("Adapter: Tamaño recibido: " + length);
+            
+            if (length <= 0 || length > 100000) { // Aumentar límite máximo
+                throw new IOException("Tamaño de string inválido: " + length);
+            }
+            
+            byte[] bytes = new byte[length];
+            int totalRead = 0;
+            
+            // Leer todos los bytes necesarios
+            while (totalRead < length) {
+                int bytesRead = input.read(bytes, totalRead, length - totalRead);
+                if (bytesRead == -1) {
+                    throw new IOException("Conexión cerrada mientras se leía string");
+                }
+                totalRead += bytesRead;
+            }
+            
+            String result = new String(bytes, StandardCharsets.UTF_8);
+            System.out.println("Adapter: Recibido string (" + length + " bytes)");
+            return result;
+            
+        } catch (Exception e) {
+            System.out.println("❌ Error crítico en receiveString: " + e.getMessage());
+            throw e;
         }
-        
-        byte[] bytes = new byte[length];
-        input.readFully(bytes);
-        String result = new String(bytes, StandardCharsets.UTF_8);
-        System.out.println("Adapter: Recibido string (" + length + " bytes)");
-        return result;
     }
 
 
