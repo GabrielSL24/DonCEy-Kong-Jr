@@ -480,50 +480,164 @@ static bool extraer_bool_json(const char *json, const char *clave) {
     char patron[100];
     snprintf(patron, sizeof(patron), "\"%s\":", clave);
     
-    printf("Buscando clave '%s' con patrón: '%s'\n", clave, patron);
-
     const char *inicio = strstr(json, patron);
     if (!inicio) {
-        printf("❌ Clave '%s' no encontrada en JSON\n", clave);
-        // Vamos a mostrar el JSON completo para debug
-        printf("📄 JSON completo (primeros 500 chars):\n%.500s\n", json);
         return false;
     }
     
     inicio += strlen(patron);
-     printf("✅ Clave '%s' encontrada, valor empieza en: '%.50s'\n", clave, inicio);
     
-    //Buscar "true" o "false"
+    // ✅ CRÍTICO: Saltar espacios en blanco, tabs, newlines
+    while (*inicio && (*inicio == ' ' || *inicio == '\t' || *inicio == '\n' || *inicio == '\r')) {
+        inicio++;
+    }
+    
+    // Buscar "true" o "false"
     if (strncmp(inicio, "true", 4) == 0) {
-        printf(" %s: true\n", clave);
         return true;
     } else if (strncmp(inicio, "false", 5) == 0) {
-        printf(" %s: false\n", clave);
-        return false;
-    }
-
-    //Si no encuentra true/false, buscar como numero(0 o 1)
-    if (strncmp(inicio, "1", 1) == 0) {
-        printf(" %s: true\n", clave);
-        return true;
-    } else if (strncmp(inicio, "0", 1) == 0) {
-        printf(" %s: false\n", clave);
         return false;
     }
     
-    // Mostrar exactamente qué hay después de la clave
-    printf("❌ Valor no reconocido para '%s'. Contenido: '", clave);
-    for (int i = 0; i < 20 && inicio[i] != '\0' && inicio[i] != ',' && inicio[i] != '}'; i++) {
-        printf("%c", inicio[i]);
+    // Si no encuentra true/false, buscar como número (0 o 1)
+    if (*inicio == '1') {
+        return true;
+    } else if (*inicio == '0') {
+        return false;
     }
-    printf("'\n");
-
-
+    
     return false;
 }
 
-// ==================== DESERIALIZACIÓN JSON COMPLETA ====================
+/**
+ * Parsea el array de enemigos del JSON
+ */
+static bool parsear_enemigos(const char* json_data, EstadoJuego *estado) {
+    // Buscar el array "enemies"
+    const char* enemies_start = strstr(json_data, "\"enemies\"");
+    if (!enemies_start) {
+        printf("⚠️  No se encontró array 'enemies' en JSON\n");
+        estado->num_cocodrilos = 0;
+        return false;
+    }
+    
+    enemies_start = strchr(enemies_start, '[');
+    if (!enemies_start) {
+        estado->num_cocodrilos = 0;
+        return false;
+    }
+    enemies_start++; // Saltar '['
+    
+    int enemy_count = 0;
+    const char* current = enemies_start;
+    
+    while (*current && *current != ']' && enemy_count < 50) {
+        // Buscar cada objeto de enemigo entre { }
+        const char* obj_start = strchr(current, '{');
+        const char* obj_end = strchr(current, '}');
+        
+        if (!obj_start || !obj_end || obj_start > obj_end) break;
+        
+        // Extraer datos del enemigo
+        estado->cocodrilos[enemy_count].x = extraer_float_json(obj_start, "x");
+        estado->cocodrilos[enemy_count].y = extraer_float_json(obj_start, "y");
+        estado->cocodrilos[enemy_count].activo = extraer_bool_json(obj_start, "active");
+        
+        // Extraer tipo
+        char* tipo_str = extraer_string_json(obj_start, "type");
+        if (tipo_str) {
+            if (strcmp(tipo_str, "RED_CROCODILE") == 0) {
+                estado->cocodrilos[enemy_count].tipo = ENEMY_RED_CROCODILE;
+            } else {
+                estado->cocodrilos[enemy_count].tipo = ENEMY_BLUE_CROCODILE;
+            }
+            free(tipo_str);
+        }
+        
+        printf("  🐊 Cocodrilo %d: (%.1f, %.1f) tipo=%d activo=%d\n",
+               enemy_count,
+               estado->cocodrilos[enemy_count].x,
+               estado->cocodrilos[enemy_count].y,
+               estado->cocodrilos[enemy_count].tipo,
+               estado->cocodrilos[enemy_count].activo);
+        
+        enemy_count++;
+        current = obj_end + 1;
+    }
+    
+    estado->num_cocodrilos = enemy_count;
+    printf("✅ Parseados %d cocodrilos\n", enemy_count);
+    return enemy_count > 0;
+}
 
+/**
+ * Parsea el array de frutas del JSON
+ */
+static bool parsear_frutas(const char* json_data, EstadoJuego *estado) {
+    // Buscar el array "fruits"
+    const char* fruits_start = strstr(json_data, "\"fruits\"");
+    if (!fruits_start) {
+        printf("⚠️  No se encontró array 'fruits' en JSON\n");
+        estado->num_frutas = 0;
+        return false;
+    }
+    
+    fruits_start = strchr(fruits_start, '[');
+    if (!fruits_start) {
+        estado->num_frutas = 0;
+        return false;
+    }
+    fruits_start++; // Saltar '['
+    
+    int fruit_count = 0;
+    const char* current = fruits_start;
+    
+    while (*current && *current != ']' && fruit_count < 30) {
+        // Buscar cada objeto de fruta entre { }
+        const char* obj_start = strchr(current, '{');
+        const char* obj_end = strchr(current, '}');
+        
+        if (!obj_start || !obj_end || obj_start > obj_end) break;
+        
+        // Extraer datos de la fruta
+        estado->frutas[fruit_count].x = extraer_float_json(obj_start, "x");
+        estado->frutas[fruit_count].y = extraer_float_json(obj_start, "y");
+        estado->frutas[fruit_count].puntos = extraer_int_json(obj_start, "points");
+        estado->frutas[fruit_count].activo = extraer_bool_json(obj_start, "active");
+        
+        // Extraer tipo
+        char* tipo_str = extraer_string_json(obj_start, "type");
+        if (tipo_str) {
+            if (strcmp(tipo_str, "BANANA") == 0) {
+                estado->frutas[fruit_count].tipo = FRUIT_BANANA;
+            } else if (strcmp(tipo_str, "APPLE") == 0) {
+                estado->frutas[fruit_count].tipo = FRUIT_APPLE;
+            } else if (strcmp(tipo_str, "PEAR") == 0) {
+                estado->frutas[fruit_count].tipo = FRUIT_PEAR;
+            } else {
+                estado->frutas[fruit_count].tipo = FRUIT_ORANGE;
+            }
+            free(tipo_str);
+        }
+        
+        printf("  🍌 Fruta %d: (%.1f, %.1f) tipo=%d puntos=%d activo=%d\n",
+               fruit_count,
+               estado->frutas[fruit_count].x,
+               estado->frutas[fruit_count].y,
+               estado->frutas[fruit_count].tipo,
+               estado->frutas[fruit_count].puntos,
+               estado->frutas[fruit_count].activo);
+        
+        fruit_count++;
+        current = obj_end + 1;
+    }
+    
+    estado->num_frutas = fruit_count;
+    printf("✅ Parseadas %d frutas\n", fruit_count);
+    return fruit_count > 0;
+}
+
+// MODIFICAR la función deserializar_json_a_estado para incluir el parseo de enemigos y frutas
 bool deserializar_json_a_estado(const char *json_data, EstadoJuego *estado) {
     printf("🔧 Deserializando JSON del servidor...\n");
     
@@ -533,28 +647,26 @@ bool deserializar_json_a_estado(const char *json_data, EstadoJuego *estado) {
     }
 
     // 1. Extraer datos del jugador directamente del JSON principal
-    // Buscar el objeto "player" dentro de "changes"
     const char* player_start = strstr(json_data, "\"player\"");
     if (!player_start) {
         printf("❌ No se encontró objeto 'player' en JSON\n");
         return false;
     }
     
-    // Buscar el inicio del objeto player { ... }
     player_start = strchr(player_start, '{');
     if (!player_start) {
         printf("❌ No se encontró inicio del objeto player\n");
         return false;
     }
     
-    // Extraer datos del jugador desde el objeto player
+    // Extraer datos del jugador
     estado->jugador.x = extraer_float_json(player_start, "x");
     estado->jugador.y = extraer_float_json(player_start, "y");
     estado->jugador.vidas = extraer_int_json(player_start, "lives");
     estado->jugador.puntuacion = extraer_int_json(player_start, "score");
     estado->jugador.activo = extraer_bool_json(player_start, "active");
     
-    // Estado del jugador desde JSON - BUSCAR DENTRO DEL OBJETO PLAYER
+    // Estado del jugador
     char* estado_str = extraer_string_json(player_start, "state");
     if (estado_str) {
         printf("🎯 Estado del jugador recibido: %s\n", estado_str);
@@ -564,19 +676,33 @@ bool deserializar_json_a_estado(const char *json_data, EstadoJuego *estado) {
         else estado->jugador.estado = ESTADO_SUELO;
         free(estado_str);
     } else {
-        printf("⚠️  No se pudo extraer estado del jugador\n");
         estado->jugador.estado = ESTADO_SUELO;
     }
     
-    // 2. PADRE (Donkey Kong) - por ahora siempre activo
-    estado->padre.activo = true;
+    // 2. PARSEAR ENEMIGOS (NUEVO)
+    parsear_enemigos(json_data, estado);
     
-    // 3. JUEGO ACTIVO
+    // 3. PARSEAR FRUTAS (NUEVO)
+    parsear_frutas(json_data, estado);
+    
+    // 4. PADRE (Donkey Kong) - por ahora siempre activo en posición fija
+    estado->padre.activo = true;
+    // Obtener posición de la meta desde GameConfig si es necesario
+    // Por ahora usar valores por defecto
+    estado->padre.x = (40 / 2) * 20 + 20 / 2; // (GRID_COLS/2) * CELL_SIZE + CELL_SIZE/2
+    estado->padre.y = 2 * 20 + 20 / 2;         // 2 * CELL_SIZE + CELL_SIZE/2
+    
+    // 5. JUEGO ACTIVO
     estado->juego_activo = extraer_bool_json(json_data, "game_active");
     
-    printf("✅ JSON deserializado - Jugador: (%.1f, %.1f), Vidas: %d, Puntos: %d, Estado: %d\n",
+    printf("✅ JSON deserializado completo:\n");
+    printf("   - Jugador: (%.1f, %.1f), Vidas: %d, Puntos: %d, Estado: %d\n",
            estado->jugador.x, estado->jugador.y, estado->jugador.vidas, 
            estado->jugador.puntuacion, estado->jugador.estado);
+    printf("   - Enemigos: %d cocodrilos\n", estado->num_cocodrilos);
+    printf("   - Frutas: %d frutas\n", estado->num_frutas);
+    printf("   - Padre activo: %s en (%.1f, %.1f)\n", 
+           estado->padre.activo ? "SI" : "NO", estado->padre.x, estado->padre.y);
     
     return true;
 }
@@ -716,41 +842,27 @@ bool parsear_lista_partidas(const char* json_str, InfoPartida partidas[], int* c
         
         if (!obj_start || !obj_end || obj_start > obj_end) break;
         
-        // Extraer game_id
-        const char* id_start = strstr(obj_start, "\"game_id\"");
-        if (id_start && id_start < obj_end) {
-            id_start = strchr(id_start, '"');
-            if (id_start) id_start++;
-            const char* id_end = strchr(id_start, '"');
-            if (id_end && id_end < obj_end) {
-                strncpy(partidas[partida_count].game_id, id_start, id_end - id_start);
-                partidas[partida_count].game_id[id_end - id_start] = '\0';
-            }
+        // ✅ CORREGIDO: Extraer game_id usando la función auxiliar
+        char* game_id_str = extraer_string_json(obj_start, "game_id");
+        if (game_id_str) {
+            strncpy(partidas[partida_count].game_id, game_id_str, 
+                    sizeof(partidas[partida_count].game_id) - 1);
+            partidas[partida_count].game_id[sizeof(partidas[partida_count].game_id) - 1] = '\0';
+            free(game_id_str);
+        } else {
+            printf("⚠️ No se pudo extraer game_id\n");
+            current = obj_end + 1;
+            continue;
         }
         
         // Extraer player_count
-        const char* players_start = strstr(obj_start, "\"player_count\"");
-        if (players_start && players_start < obj_end) {
-            players_start = strchr(players_start, ':');
-            if (players_start) partidas[partida_count].player_count = atoi(players_start + 1);
-        }
+        partidas[partida_count].player_count = extraer_int_json(obj_start, "player_count");
         
         // Extraer spectators  
-        const char* specs_start = strstr(obj_start, "\"spectators\"");
-        if (specs_start && specs_start < obj_end) {
-            specs_start = strchr(specs_start, ':');
-            if (specs_start) partidas[partida_count].spectators = atoi(specs_start + 1);
-        }
+        partidas[partida_count].spectators = extraer_int_json(obj_start, "spectators");
         
         // Extraer active
-        const char* active_start = strstr(obj_start, "\"active\"");
-        if (active_start && active_start < obj_end) {
-            active_start = strchr(active_start, ':');
-            if (active_start) {
-                if (strstr(active_start, "true")) partidas[partida_count].active = true;
-                else partidas[partida_count].active = false;
-            }
-        }
+        partidas[partida_count].active = extraer_bool_json(obj_start, "active");
         
         printf("🎮 Partida %d: %s (J:%d, E:%d, A:%s)\n",
                partida_count, partidas[partida_count].game_id,
@@ -763,6 +875,7 @@ bool parsear_lista_partidas(const char* json_str, InfoPartida partidas[], int* c
     }
     
     *count = partida_count;
+    printf("✅ Total de partidas parseadas: %d\n", partida_count);
     return partida_count > 0;
 }
 

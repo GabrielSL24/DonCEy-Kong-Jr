@@ -397,7 +397,6 @@ void dibujar_hitboxes(const EstadoJuego *estado) {
 
 void dibujar_interfaz_menu(EstadoMenu estado, int seleccion, InfoPartida partidas[], int count, const char* partida_actual) {
     // ESTA FUNCIÓN SOLO SE LLAMA DESDE ESTADOS DE MENÚ
-    // NO desde estados de juego
     
     switch (estado) {
         case MENU_MAIN:
@@ -408,12 +407,17 @@ void dibujar_interfaz_menu(EstadoMenu estado, int seleccion, InfoPartida partida
             dibujar_seleccion_partida(seleccion, partidas, count);
             break;
             
+        case MENU_CREATING_GAME:
+        case MENU_JOINING_GAME:
+            dibujar_estado_espera(estado);
+            break;
+            
         case MENU_PLAYING:
-            // EL HUD del jugador se dibuja en dibujar_ui() dentro de dibujar_escena_completa()
+            // EL HUD del jugador se dibuja en main.c con dibujar_hud_jugador()
             break;
             
         case MENU_SPECTATING:
-            // EL HUD del espectador se dibuja en dibujar_ui() dentro de dibujar_escena_completa()
+            // EL HUD del espectador se dibuja en main.c con dibujar_hud_espectador()
             break;
     }
 }

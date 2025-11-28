@@ -14,6 +14,7 @@ public final class Fruit {
     /**
      * Crea una fruta.
      *
+     * @param id     identificador único de la fruta.
      * @param x      coordenada X del centro de la fruta, en píxeles.
      * @param y      coordenada Y del centro de la fruta, en píxeles.
      * @param points puntos que otorga al ser recogida.
@@ -29,11 +30,12 @@ public final class Fruit {
         this.x = x;
         this.y = y;
         this.points = points;
-        this.id = id;
     }
 
-    
-    public Integer getId() {  // ← AGREGAR ESTE MÉTODO
+    /**
+     * @return identificador único de la fruta.
+     */
+    public Integer getId() {
         return id;
     }
 
@@ -71,10 +73,6 @@ public final class Fruit {
      */
     public void collect() {
         active = false;
-    }
-
-    public Integer getId() {
-        return id;
     }
 
     /**
