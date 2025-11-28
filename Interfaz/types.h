@@ -19,7 +19,7 @@ typedef enum {
     FRUIT_ORANGE
 } TipoFruta;
 
-// Estados del jugador (para JSON)
+// Estados del jugador 
 typedef enum {
     PLAYER_STANDING,
     PLAYER_MOVING_LEFT,
@@ -35,19 +35,18 @@ typedef enum {
     CLIENT_SPECTATOR
 } TipoCliente;
 
-// ==================== NUEVOS ENUMS PARA PROTOCOLO COMPLETO ====================
 
-// Tipos de request (COMPLETAR según protocolo)
+// Tipos de request
 typedef enum {
     REQUEST_CREATE_GAME,
     REQUEST_JOIN_GAME,
     REQUEST_LEAVE_GAME,
-    REQUEST_START_GAME,    // ← FALTABA
+    REQUEST_START_GAME,    
     REQUEST_LIST_GAMES,
-    REQUEST_GAME_INPUT     // ← FALTABA
+    REQUEST_GAME_INPUT     
 } TipoRequest;
 
-// Tipos de response (COMPLETAR según protocolo)  
+// Tipos de response
 typedef enum {
     RESPONSE_GAME_CREATED,
     RESPONSE_GAME_JOINED,
@@ -66,7 +65,7 @@ typedef enum {
     STATUS_ERROR
 } EstadoRespuesta;
 
-// Tipos de input (para JSON)
+// Tipos de input 
 typedef enum {
     INPUT_KEY_PRESSED,
     INPUT_KEY_RELEASED
@@ -82,7 +81,7 @@ typedef enum {
     ESTADO_CAYENDO
 } EstadoJugador;
 
-// Estados del menú (ESTÁ BIEN)
+// Estados del menú 
 typedef enum {
     MENU_MAIN,
     MENU_SELECT_GAME, 
@@ -92,7 +91,7 @@ typedef enum {
     MENU_JOINING_GAME,  
 } EstadoMenu;
 
-// Información de partida (ESTÁ BIEN)
+// Información de partida disponible
 typedef struct {
     char game_id[50];
     int player_count;
@@ -102,7 +101,7 @@ typedef struct {
 
 // ==================== ESTRUCTURAS DEL JUEGO ====================
 
-// Entidades del juego (solo para renderizado) - ESTÁN BIEN
+// Entidades del juego (solo para renderizado) 
 typedef struct {
     float x, y;
     int vidas;
@@ -137,7 +136,7 @@ typedef struct {
     float x, y, ancho;
 } Plataforma;
 
-// Estado completo del juego (solo para renderizar) - ESTÁ BIEN
+// Estado completo del juego (solo para renderizar)
 typedef struct {
     Jugador jugador;
     Padre padre;

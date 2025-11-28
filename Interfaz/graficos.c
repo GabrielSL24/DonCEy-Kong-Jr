@@ -6,14 +6,14 @@
 
 SistemaSprites sprites_global;
 
-// ==================== INICIALIZACIÓN Y LIMPIEZA ====================
+// ==================== INICIALIZACION Y LIMPIEZA ====================
 
 void inicializar_graficos(void) {
     InitWindow(SCREEN_WIDTH, SCREEN_HEIGHT, "Donkey Kong Jr - Cliente");
     SetTargetFPS(FPS);
     cargar_sprites(&sprites_global);
     cargar_fondo(&sprites_global);
-    printf("✅ Gráficos inicializados: %dx%d @ %d FPS\n", SCREEN_WIDTH, SCREEN_HEIGHT, FPS);
+    printf("Graficos inicializados: %dx%d @ %d FPS\n", SCREEN_WIDTH, SCREEN_HEIGHT, FPS);
 }
 
 void cargar_sprites(SistemaSprites *sprites) {
@@ -25,40 +25,40 @@ void cargar_sprites(SistemaSprites *sprites) {
     if (FileExists(SPRITE_DKJ)) {
         sprites->jugador.textura = LoadTexture(SPRITE_DKJ);
         sprites->jugador.cargado = true;
-        printf("✓ Jugador cargado: %s\n", SPRITE_DKJ);
+        printf("Jugador cargado: %s\n", SPRITE_DKJ);
     }
     
     // PADRE - Donkey Kong
     if (FileExists(SPRITE_DK)) {
         sprites->padre.textura = LoadTexture(SPRITE_DK);
         sprites->padre.cargado = true;
-        printf("✓ Padre cargado: %s\n", SPRITE_DK);
+        printf("Padre cargado: %s\n", SPRITE_DK);
     }
     
     // COCODRILOS
     if (FileExists(SPRITE_COCODRILO_ROJO)) {
         sprites->cocodrilo_rojo.textura = LoadTexture(SPRITE_COCODRILO_ROJO);
         sprites->cocodrilo_rojo.cargado = true;
-        printf("✓ Cocodrilo rojo cargado: %s\n", SPRITE_COCODRILO_ROJO);
+        printf("Cocodrilo rojo cargado: %s\n", SPRITE_COCODRILO_ROJO);
     }
     
     if (FileExists(SPRITE_COCODRILO_AZUL)) {
         sprites->cocodrilo_azul.textura = LoadTexture(SPRITE_COCODRILO_AZUL);
         sprites->cocodrilo_azul.cargado = true;
-        printf("✓ Cocodrilo azul cargado: %s\n", SPRITE_COCODRILO_AZUL);
+        printf("Cocodrilo azul cargado: %s\n", SPRITE_COCODRILO_AZUL);
     }
     
     // FRUTAS - Mapear tipos a sprites disponibles
     if (FileExists(SPRITE_FRUTA_PLATANO)) {
         sprites->fruta_banana.textura = LoadTexture(SPRITE_FRUTA_PLATANO);
         sprites->fruta_banana.cargado = true;
-        printf("✓ Fruta banana cargada: %s\n", SPRITE_FRUTA_PLATANO);
+        printf("Fruta banana cargada: %s\n", SPRITE_FRUTA_PLATANO);
     }
     
     if (FileExists(SPRITE_FRUTA_MANZANA)) {
         sprites->fruta_apple.textura = LoadTexture(SPRITE_FRUTA_MANZANA);
         sprites->fruta_apple.cargado = true;
-        printf("✓ Fruta apple cargada: %s\n", SPRITE_FRUTA_MANZANA);
+        printf("Fruta apple cargada: %s\n", SPRITE_FRUTA_MANZANA);
     }
     
     // Usar mismos sprites para tipos faltantes (temporal)
@@ -67,7 +67,7 @@ void cargar_sprites(SistemaSprites *sprites) {
         sprites->fruta_pear.cargado = true;
         sprites->fruta_orange.textura = LoadTexture(SPRITE_FRUTA_PERAS); // Reutilizar
         sprites->fruta_orange.cargado = true;
-        printf("✓ Frutas pear/orange cargadas: %s\n", SPRITE_FRUTA_PERAS);
+        printf("Frutas pear/orange cargadas: %s\n", SPRITE_FRUTA_PERAS);
     }
     
     printf("=== SPRITES CARGADOS ===\n");
@@ -83,14 +83,14 @@ void descargar_sprites(SistemaSprites *sprites) {
     if (sprites->fruta_pear.cargado) UnloadTexture(sprites->fruta_pear.textura);
     if (sprites->fruta_orange.cargado) UnloadTexture(sprites->fruta_orange.textura);
     
-    printf("✅ Sprites descargados\n");
+    printf("Sprites descargados\n");
 }
 
 void cerrar_graficos(void) {
     descargar_sprites(&sprites_global);
     descargar_fondo(&sprites_global);
     CloseWindow();
-    printf("✅ Gráficos cerrados\n");
+    printf("Graficos cerrados\n");
 }
 
 // ==================== FUNCIONES DE DIBUJO DE ENTIDADES ====================
@@ -112,7 +112,7 @@ void dibujar_jugador(const Jugador *jugador, const SistemaSprites *sprites) {
             (Vector2){0, 0}, 0, WHITE
         );
     } else {
-        // Fallback: rectángulo de debug
+        //rectangulo de debug
         DrawRectangle(jugador->x - JUGADOR_HITBOX/2, jugador->y - JUGADOR_HITBOX/2, 
                      JUGADOR_HITBOX, JUGADOR_HITBOX, COLOR_JUGADOR);
     }
@@ -240,7 +240,7 @@ void dibujar_plataformas(const Plataforma plataformas[], int num_plataformas) {
     for (int i = 0; i < num_plataformas; i++) {
         DrawRectangle(
             plataformas[i].x,
-            plataformas[i].y - 5, // Pequeño grosor
+            plataformas[i].y - 5, // Ajuste vertical para centrar
             plataformas[i].ancho,
             10, // Altura de plataforma
             COLOR_PLATAFORMA
@@ -255,10 +255,10 @@ void cargar_fondo(SistemaSprites *sprites) {
         sprites->fondo.textura = LoadTextureFromImage(imagen_fondo);
         UnloadImage(imagen_fondo);
         sprites->fondo.cargado = true;
-        printf("✅ Fondo cargado: %s -> %dx%d\n", SPRITE_FONDO, SCREEN_WIDTH, SCREEN_HEIGHT);
+        printf("Fondo cargado: %s -> %dx%d\n", SPRITE_FONDO, SCREEN_WIDTH, SCREEN_HEIGHT);
     } else {
         sprites->fondo.cargado = false;
-        printf("❌ No se encontró: %s\n", SPRITE_FONDO);
+        printf("No se encontró: %s\n", SPRITE_FONDO);
     }
 }
 
@@ -266,7 +266,7 @@ void descargar_fondo(SistemaSprites *sprites) {
     if (sprites->fondo.cargado) {
         UnloadTexture(sprites->fondo.textura);
         sprites->fondo.cargado = false;
-        printf("✅ Fondo descargado\n");
+        printf("Fondo descargado\n");
     }
 }
 

@@ -11,17 +11,17 @@
 void actualizar_menu_principal(FrameInputs* inputs, EstadoMenu* estado_menu, int* seleccion_actual) {
     if (inputs->enter_pressed) {
         if (*seleccion_actual == 0) {
-            // JUGADOR - Crear nueva partida con handshake
+            // JUGADOR - Crea nueva partida con identificador único
             char game_id[50];
             snprintf(game_id, sizeof(game_id), "partida_%lld", (long long)time(NULL));
             
             if (servidor_conectado && crear_nueva_partida(game_id)) {
                 strcpy(partida_seleccionada_global, game_id);
-                *estado_menu = MENU_CREATING_GAME;  // ← NUEVO estado de espera
-                printf("⏳ Creando partida: %s - Esperando confirmación...\n", game_id);
+                *estado_menu = MENU_CREATING_GAME;  //estado de espera
+                printf("Creando partida: %s - Esperando confirmacion...\n", game_id);
             }
         } else if (*seleccion_actual == 1) {
-            // ESPECTADOR - Solicitar lista
+            // ESPECTADOR - Solicita lista
             *estado_menu = MENU_SELECT_GAME;
             if (servidor_conectado) {
                 solicitar_lista_partidas();
@@ -29,7 +29,7 @@ void actualizar_menu_principal(FrameInputs* inputs, EstadoMenu* estado_menu, int
         }
     }
     
-    // Navegación del menú
+    // Navegacion del menu
     if (inputs->seleccion_menu != 0) {
         *seleccion_actual += inputs->seleccion_menu;
         if (*seleccion_actual < 0) *seleccion_actual = 1;
@@ -37,7 +37,7 @@ void actualizar_menu_principal(FrameInputs* inputs, EstadoMenu* estado_menu, int
     }
 }
 
-// ==================== ACTUALIZACIÓN DE SELECCIÓN DE PARTIDA ====================
+// ==================== ACTUALIZACION DE SELECCION DE PARTIDA ====================
 
 void actualizar_seleccion_partida(FrameInputs* inputs, EstadoMenu* estado_menu, int* seleccion_actual) {
     if (inputs->escape_pressed) {
@@ -47,31 +47,31 @@ void actualizar_seleccion_partida(FrameInputs* inputs, EstadoMenu* estado_menu, 
     
     // Procesar respuesta del servidor (lista de partidas)
     if (cantidad_partidas == 0) {
-        procesar_respuesta_servidor(NULL); // Intentar obtener lista
+        procesar_respuesta_servidor(NULL); // Intenta obtener la lista
     }
     
-    // Navegación y selección...
+    // Navegacion y seleccion...
     if (inputs->enter_pressed && cantidad_partidas > 0) {
         if (unirse_partida_espectador(partidas_disponibles[*seleccion_actual].game_id)) {
             strcpy(partida_seleccionada_global, partidas_disponibles[*seleccion_actual].game_id);
-            *estado_menu = MENU_JOINING_GAME;  // ← NUEVO estado de espera
-            printf("⏳ Uniéndose como espectador...\n");
+            *estado_menu = MENU_JOINING_GAME;  //estado de espera
+            printf("Uniendose como espectador...\n");
         }
     }
 }
 
-// ==================== ACTUALIZACIÓN MODO JUGADOR ====================
+// ==================== ACTUALIZACION MODO JUGADOR ====================
 
 void actualizar_modo_jugador(FrameInputs* inputs, EstadoMenu* estado_menu, EstadoJuego* estado_juego) {
-    // Enviar inputs al servidor
+    // Envia inputs al servidor
     static int frame_count = 0;
     if (servidor_conectado && inputs->num_inputs > 0) {
         for (int i = 0; i < inputs->num_inputs; i++) {
             const char* input_str = inputs->inputs[i];
-            
-            // ✅ SIMPLIFICADO: El string ya viene con _PRESSED/_RELEASED
+        
+            //El string ya viene con _PRESSED/_RELEASED
             if (strstr(input_str, "_RELEASED") != NULL) {
-                // Extraer solo la parte del key (sin _RELEASED)
+                // Extrae solo la parte del key (sin _RELEASED)
                 char key[20];
                 strncpy(key, input_str, strlen(input_str) - 9);
                 key[strlen(input_str) - 9] = '\0';
@@ -79,12 +79,12 @@ void actualizar_modo_jugador(FrameInputs* inputs, EstadoMenu* estado_menu, Estad
                 enviar_input_al_servidor(
                     CLIENT_PLAYER, 
                     partida_seleccionada_global,
-                    "KEY_RELEASED",  // ← tipo fijo
-                    key              // ← ej: "LEFT", "RIGHT", etc.
+                    "KEY_RELEASED",  // tipo fijo
+                    key              // ej: "LEFT", "RIGHT"...
                 );
             } 
             else if (strstr(input_str, "_PRESSED") != NULL) {
-                // Extraer solo la parte del key (sin _PRESSED)
+                // Extrae solo la parte del key (sin _PRESSED)
                 char key[20];
                 strncpy(key, input_str, strlen(input_str) - 8);
                 key[strlen(input_str) - 8] = '\0';
@@ -92,8 +92,8 @@ void actualizar_modo_jugador(FrameInputs* inputs, EstadoMenu* estado_menu, Estad
                 enviar_input_al_servidor(
                     CLIENT_PLAYER, 
                     partida_seleccionada_global,
-                    "KEY_PRESSED",   // ← tipo fijo  
-                    key              // ← ej: "LEFT", "RIGHT", etc.
+                    "KEY_PRESSED",   // tipo fijo  
+                    key              // ej: "LEFT", "RIGHT"...
                 );
             }
         }
@@ -104,9 +104,9 @@ void actualizar_modo_jugador(FrameInputs* inputs, EstadoMenu* estado_menu, Estad
         procesar_respuesta_servidor(estado_juego);
     }
     /*
-    // ✅ DEBUG: Mostrar posición del jugador cada 60 frames (≈1 segundo)
+    // DEBUG: Mostrar posición del jugador cada 60 frames (≈1 segundo)
     if (frame_count++ % 60 == 0) {
-        printf("🎮 DEBUG Jugador - X: %.1f, Y: %.1f, Estado: %d, Vidas: %d\n", 
+        printf("DEBUG Jugador - X: %.1f, Y: %.1f, Estado: %d, Vidas: %d\n", 
                estado_juego->jugador.x, estado_juego->jugador.y, 
                estado_juego->jugador.estado, estado_juego->jugador.vidas);
     }
@@ -116,25 +116,25 @@ void actualizar_modo_jugador(FrameInputs* inputs, EstadoMenu* estado_menu, Estad
         salir_partida_jugador(partida_seleccionada_global);
         set_partida_activa(false);
         *estado_menu = MENU_MAIN;
-        printf("=== VOLVIENDO AL MENÚ DESDE JUEGO ===\n");
+        printf("=== VOLVIENDO AL MENU DESDE JUEGO ===\n");
     }
 }
 
 
-// ==================== ACTUALIZACIÓN MODO ESPECTADOR ====================
+// ==================== ACTUALIZACION MODO ESPECTADOR ====================
 
 void actualizar_modo_espectador(FrameInputs* inputs, EstadoMenu* estado_menu, EstadoJuego* estado_juego) {
     // CAMBIO: usar procesar_respuesta_servidor en lugar de recibir_estado_actualizado
     if (servidor_conectado) {
-        procesar_respuesta_servidor(estado_juego); // ← CAMBIADO
+        procesar_respuesta_servidor(estado_juego); // CAMBIADO
     }
     
-    // Volver al menú si se presiona ESC
+    // Volver al menu si se presiona ESC
     if (inputs->escape_pressed) {
         salir_partida_espectador(partida_seleccionada_global);
-        set_partida_activa(false); // ← AGREGAR
+        set_partida_activa(false); // AGREGAR
         *estado_menu = MENU_MAIN;
-        printf("=== VOLVIENDO AL MENÚ DESDE ESPECTADOR ===\n");
+        printf("=== VOLVIENDO AL MENU DESDE ESPECTADOR ===\n");
     }
 }
 
@@ -145,24 +145,24 @@ void actualizar_estado_espera(FrameInputs* inputs, EstadoMenu* estado_menu, Esta
     if (procesar_respuesta_servidor(estado_juego)) {
         if (*estado_menu == MENU_CREATING_GAME && !start_game_enviado) {
             // Después de GAME_CREATED, enviar START_GAME
-            printf("✅ GAME_CREATED recibido, enviando START_GAME...\n");
+            printf("GAME_CREATED recibido, enviando START_GAME...\n");
             if (confirmar_inicio_partida(partida_seleccionada_global)) {
                 start_game_enviado = true;
-                printf("⏳ Esperando GAME_STARTED...\n");
+                printf("Esperando GAME_STARTED...\n");
             }
         }
         else if (*estado_menu == MENU_JOINING_GAME) {
             // Para espectador, directamente avanzar
             *estado_menu = MENU_SPECTATING;
-            printf("✅ ¡Unido como ESPECTADOR!\n");
+            printf("¡Unido como ESPECTADOR!\n");
         }
     }
     
-    // Si ya enviamos START_GAME y recibimos confirmación, avanzar a juego
+    //Si ya se envió START_GAME y la partida está activa, cambiar a modo JUGADOR
     if (start_game_enviado && esta_en_partida_activa()) {
         *estado_menu = MENU_PLAYING;
         start_game_enviado = false;
-        printf("🎮 ¡Partida INICIADA como JUGADOR!\n");
+        printf("¡Partida INICIADA como JUGADOR!\n");
     }
     
     // Cancelar con ESC
@@ -170,7 +170,7 @@ void actualizar_estado_espera(FrameInputs* inputs, EstadoMenu* estado_menu, Esta
         *estado_menu = MENU_MAIN;
         set_partida_activa(false);
         start_game_enviado = false;
-        printf("❌ Cancelando conexión...\n");
+        printf("Cancelando conexion...\n");
     }
 }
 // ==================== RENDERIZADO DE MENÚS ====================
@@ -182,7 +182,7 @@ void dibujar_menu_principal(int seleccion) {
     // Fondo semitransparente
     DrawRectangle(0, 0, GetScreenWidth(), GetScreenHeight(), (Color){0, 0, 0, 200});
     
-    // Título
+    // Titulo
     DrawText("DONKEY KONG JR", centerX - 150, centerY - 150, 40, YELLOW);
     
     // Opciones
@@ -197,7 +197,7 @@ void dibujar_menu_principal(int seleccion) {
     }
     
     // Instrucciones
-    DrawText("Usa ↑↓ para navegar, ENTER para seleccionar", centerX - 200, centerY + 100, 20, LIGHTGRAY);
+    DrawText("Usa arriba o abajo para navegar, ENTER para seleccionar", centerX - 200, centerY + 100, 20, LIGHTGRAY);
 }
 
 void dibujar_seleccion_partida(int seleccion, InfoPartida partidas[], int count) {
@@ -233,7 +233,7 @@ void dibujar_seleccion_partida(int seleccion, InfoPartida partidas[], int count)
     }
     
     // Instrucciones
-    DrawText("Usa ↑↓ para navegar, ENTER para observar, ESC para volver", 
+    DrawText("Usa flecha arriba o abajo para navegar, ENTER para observar, ESC para volver", 
              centerX - 250, centerY + 150, 20, LIGHTGRAY);
 }
 

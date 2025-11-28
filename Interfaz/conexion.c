@@ -4,11 +4,9 @@
 #include <stdlib.h>
 #include <string.h>
 #include <time.h>
-
-// Incluir el adapter
 #include "../Server/AdapterC.h"
 
-// AISLAR winsock con defines ANTES de incluirlo
+//Se aisla el winsock con defines antes de incluir las librerias
 #define WIN32_LEAN_AND_MEAN
 #define NOGDI
 #define NOUSER
@@ -17,25 +15,25 @@
 #pragma comment(lib, "ws2_32.lib")
 
 
-// ==================== DEFINICIÓN DE VARIABLES GLOBALES ====================
+// ==================== DEFINICION DE VARIABLES GLOBALES ====================
 bool servidor_conectado = false;
 InfoPartida partidas_disponibles[10];
 int cantidad_partidas = 0;
 EstadoMenu estado_menu_actual = MENU_MAIN;
 char partida_seleccionada_global[50] = "";
 
-// Variable para controlar estado de partida (EVITA SPAM)
+//Variable para controlar estado de partida
 static bool partida_activa = false;
 static char* extraer_string_json(const char *json, const char *clave);
 static float extraer_float_json(const char *json, const char *clave);
 static int extraer_int_json(const char *json, const char *clave);
 static bool extraer_bool_json(const char *json, const char *clave);
 
-// Variables globales de conexión
+//Variables globales de conexion
 static SOCKET socket_servidor = INVALID_SOCKET;
 static WSADATA wsaData;
 
-// ==================== INICIALIZACIÓN DE PARTIDAS DISPONIBLES ====================
+// ==================== INICIALIZACION DE PARTIDAS DISPONIBLES ====================
 void inicializar_partidas_disponibles(void) {
     cantidad_partidas = 0;
     for (int i = 0; i < 10; i++) {
@@ -53,32 +51,31 @@ bool esta_en_partida_activa(void) {
 
 void set_partida_activa(bool activa) {
     partida_activa = activa;
-    printf("🎮 Partida %s\n", activa ? "ACTIVADA" : "DESACTIVADA");
+    printf("Partida %s\n", activa ? "ACTIVADA" : "DESACTIVADA");
 }
 
-// ==================== FUNCIONES DE CONEXIÓN ====================
+// ==================== FUNCIONES DE CONEXION ====================
 bool conectar_servidor(const char* ip) {
-    printf("🔌 Conectando al servidor en %s:25557...\n", ip);
+    printf("Conectando al servidor en %s:25557...\n", ip);
 
     inicializar_partidas_disponibles();
-    set_partida_activa(false); // Asegurar que empiece desactivada
+    set_partida_activa(false); 
 
-    // ... (el resto de la función conectar_servidor se mantiene igual)
     // Inicializar Winsock
     if (WSAStartup(MAKEWORD(2,2), &wsaData) != 0) {
-        printf("❌ Error inicializando Winsock\n");
+        printf("Error inicializando Winsock\n");
         return false;
     }
 
     // Crear Socket
     socket_servidor = socket(AF_INET, SOCK_STREAM, 0);
     if (socket_servidor == INVALID_SOCKET) {
-        printf("❌ Error creando socket\n");
+        printf("Error creando socket\n");
         WSACleanup();
         return false;
     }
 
-    // Configurar dirección del servidor
+    // Configurar direccion del servidor
     struct sockaddr_in server_addr;
     server_addr.sin_family = AF_INET;
     server_addr.sin_port = htons(25557);
@@ -87,7 +84,7 @@ bool conectar_servidor(const char* ip) {
         // Intentar resolver por nombre de host
         struct hostent *host = gethostbyname(ip);
         if (host == NULL) {
-            printf("❌ Error resolviendo host: %s\n", ip);
+            printf("Error resolviendo host: %s\n", ip);
             closesocket(socket_servidor);
             WSACleanup();
             return false;
@@ -97,25 +94,25 @@ bool conectar_servidor(const char* ip) {
 
     // Conectar
     if(connect(socket_servidor, (struct sockaddr*)&server_addr, sizeof(server_addr)) == SOCKET_ERROR) {
-        printf("❌ Error conectando al servidor %s\n", ip);
+        printf("Error conectando al servidor %s\n", ip);
         closesocket(socket_servidor);
         WSACleanup();
         return false;
     }
 
     servidor_conectado = true;
-    printf("✅ ¡Conectado al servidor!\n");
+    printf("Conectado al servidor!\n");
     
-    // Identificación inicial
+    // Identificacion inicial
     int tipo_servidor;
     if (adapter_receive_identification(socket_servidor, &tipo_servidor) > 0) {
-        printf("📡 Servidor identificado como: %s\n", adapter_get_client_type_name(tipo_servidor));
+        printf("Servidor identificado como: %s\n", adapter_get_client_type_name(tipo_servidor));
     }
     
-    // Enviar identificación como JUGADOR
+    // Enviar identificacion como JUGADOR
     int mi_tipo = 1; // CLIENT_JUGADOR
     if (adapter_send_identification(socket_servidor, mi_tipo) > 0) {
-        printf("👤 Identificado como: %s\n", adapter_get_client_type_name(mi_tipo));
+        printf("Identificado como: %s\n", adapter_get_client_type_name(mi_tipo));
     }
 
     return true;
@@ -123,31 +120,31 @@ bool conectar_servidor(const char* ip) {
 
 void desconectar_servidor(void) {
     if (servidor_conectado) {
-        set_partida_activa(false); // Desactivar partida al desconectar
+        set_partida_activa(false); // Desactiva partida al desconectar
         closesocket(socket_servidor);
         WSACleanup();
         servidor_conectado = false;
-        printf("🔌 Desconectado del servidor\n");
+        printf("Desconectado del servidor\n");
     }
 }
 
 
-// ==================== FUNCIONES DE SERIALIZACIÓN JSON ====================
+// ==================== FUNCIONES DE SERIALIZACION JSON ====================
 
 bool serializar_input_a_json(TipoCliente client_type, const char* game_id,
                             const char* input_type, const char* key, PaqueteJSON *paquete) {
-    // Crear JSON manualmente
+    //Crea JSON manualmente
     const char* client_type_str = (client_type == CLIENT_PLAYER) ? "PLAYER" : "SPECTATOR";
     
-    // Obtener timestamp actual
+    //obtiene el timestamp actual
     time_t timestamp = time(NULL);
     
-    // Calcular tamaño necesario
+    // Calcula tamaño necesario
     size_t buffer_size = 300; // Aumentado por el nuevo campo
     if (game_id) buffer_size += strlen(game_id);
     if (key) buffer_size += strlen(key);
     
-    // Allocar memoria
+    //asigna memoria
     paquete->json_data = (char*)malloc(buffer_size);
     if (!paquete->json_data) return false;
     
@@ -156,7 +153,7 @@ bool serializar_input_a_json(TipoCliente client_type, const char* game_id,
         "{\n"
         "  \"client_type\": \"%s\",\n"
         "  \"game_id\": \"%s\",\n"
-        "  \"request_type\": \"GAME_INPUT\",\n"  // ← NUEVO CAMPO
+        "  \"request_type\": \"GAME_INPUT\",\n" 
         "  \"input_type\": \"%s\",\n"
         "  \"key\": \"%s\",\n"
         "  \"timestamp\": %lld\n" 
@@ -165,39 +162,39 @@ bool serializar_input_a_json(TipoCliente client_type, const char* game_id,
         input_type, key ? key : "UNKNOWN", timestamp);
     
     paquete->json_size = strlen(paquete->json_data);
-    printf("📤 JSON Input generado: %s\n", paquete->json_data);
+    printf("JSON Input generado: %s\n", paquete->json_data);
     return true;
 }
 
-// ==================== FUNCIONES DE COMUNICACIÓN PRINCIPALES ====================
+// ==================== FUNCIONES DE COMUNICACION PRINCIPALES ====================
 
 bool enviar_input_al_servidor(TipoCliente client_type, const char* game_id,
                              const char* input_type, const char* key) {
-    if (!servidor_conectado || !partida_activa) {  // ← SOLO si partida activa
-        printf("⚠️  Servidor no conectado o partida no activa, input ignorado: %s\n", key);
+    if (!servidor_conectado || !partida_activa) {  //solo si la partida esta activa
+        printf("Servidor no conectado o partida no activa, input ignorado: %s\n", key);
         return false;
     }
     
     PaqueteJSON paquete;
     if (!serializar_input_a_json(client_type, game_id, input_type, key, &paquete)) {
-        printf("❌ Error serializando input a JSON\n");
+        printf("Error serializando input a JSON\n");
         return false;
     }
     
-    // Enviar tamaño primero
+    // Envia tamaño primero
     adapter_send_int(socket_servidor, (int)paquete.json_size);
     
-    // Enviar datos JSON
+    // Envia datos JSON
     int bytes_sent = send(socket_servidor, paquete.json_data, (int)paquete.json_size, 0);
     
     liberar_paquete_json(&paquete);
     
     if (bytes_sent == SOCKET_ERROR) {
-        printf("❌ Error enviando JSON al servidor\n");
+        printf("Error enviando JSON al servidor\n");
         return false;
     }
     
-    printf("✅ Input enviado al servidor: %s - %s\n", input_type, key);
+    printf("Input enviado al servidor: %s - %s\n", input_type, key);
     return true;
 }
 // ==================== FUNCIONES DE HANDSHAKE ====================
@@ -220,26 +217,26 @@ bool confirmar_inicio_partida(const char* game_id) {
         "}",
         game_id, (long long)timestamp);
     
-    printf("📤 Confirmando inicio de partida: %s\n", json_data);
+    printf("Confirmando inicio de partida: %s\n", json_data);
     
-    // Enviar tamaño primero
+    // Envia tamaño primero
     adapter_send_int(socket_servidor, (int)strlen(json_data));
     
-    // Enviar datos JSON
+    // Envia datos JSON
     int bytes_sent = send(socket_servidor, json_data, (int)strlen(json_data), 0);
     
     free(json_data);
     
     if (bytes_sent == SOCKET_ERROR) {
-        printf("❌ Error confirmando inicio de partida\n");
+        printf("Error confirmando inicio de partida\n");
         return false;
     }
     
-    printf("✅ Inicio de partida confirmado: %s\n", game_id);
+    printf("Inicio de partida confirmado: %s\n", game_id);
     return true;
 }
 
-// Función auxiliar para extraer valores string del JSON
+// Funcion auxiliar para extraer valores string del JSON
 static char* extraer_string_json(const char *json, const char *clave) {
     char patron[100];
     snprintf(patron, sizeof(patron), "\"%s\":", clave);
