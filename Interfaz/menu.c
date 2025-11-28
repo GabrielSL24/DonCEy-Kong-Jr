@@ -17,13 +17,9 @@ void actualizar_menu_principal(FrameInputs* inputs, EstadoMenu* estado_menu, int
             
             if (servidor_conectado && crear_nueva_partida(game_id)) {
                 strcpy(partida_seleccionada_global, game_id);
-<<<<<<< HEAD
-                *estado_menu = MENU_CREATING_GAME;
-                printf("⏳ Creando partida: %s - Esperando confirmación...\n", game_id);
-=======
+
                 *estado_menu = MENU_CREATING_GAME;  //estado de espera
                 printf("Creando partida: %s - Esperando confirmacion...\n", game_id);
->>>>>>> c50e311a2a21737eff6e49ef23a67af831791011
             }
         } else if (*seleccion_actual == 1) {
             // ESPECTADOR - Solicita lista
@@ -68,10 +64,10 @@ void actualizar_seleccion_partida(FrameInputs* inputs, EstadoMenu* estado_menu, 
 // ==================== ACTUALIZACION MODO JUGADOR ====================
 
 void actualizar_modo_jugador(FrameInputs* inputs, EstadoMenu* estado_menu, EstadoJuego* estado_juego) {
-<<<<<<< HEAD
+
     // Verificar que la conexión sigue activa
     if (!servidor_conectado) {
-        printf("❌ Servidor desconectado, volviendo al menú\n");
+        printf("Servidor desconectado, volviendo al menú\n");
         *estado_menu = MENU_MAIN;
         return;
     }
@@ -82,60 +78,29 @@ void actualizar_modo_jugador(FrameInputs* inputs, EstadoMenu* estado_menu, Estad
             const char* input_str = inputs->inputs[i];
             
             if (strstr(input_str, "_RELEASED") != NULL) {
-=======
-    // Envia inputs al servidor
-    static int frame_count = 0;
-    if (servidor_conectado && inputs->num_inputs > 0) {
-        for (int i = 0; i < inputs->num_inputs; i++) {
-            const char* input_str = inputs->inputs[i];
-        
-            //El string ya viene con _PRESSED/_RELEASED
-            if (strstr(input_str, "_RELEASED") != NULL) {
-                // Extrae solo la parte del key (sin _RELEASED)
->>>>>>> c50e311a2a21737eff6e49ef23a67af831791011
+
                 char key[20];
                 strncpy(key, input_str, strlen(input_str) - 9);
                 key[strlen(input_str) - 9] = '\0';
                 
-<<<<<<< HEAD
+
                 if (!enviar_input_al_servidor(CLIENT_PLAYER, partida_seleccionada_global,
                                              "KEY_RELEASED", key)) {
-                    printf("❌ Error enviando input, servidor puede estar desconectado\n");
+                    printf("Error enviando input, servidor puede estar desconectado\n");
                     *estado_menu = MENU_MAIN;
                     return;
                 }
             } 
             else if (strstr(input_str, "_PRESSED") != NULL) {
-=======
-                enviar_input_al_servidor(
-                    CLIENT_PLAYER, 
-                    partida_seleccionada_global,
-                    "KEY_RELEASED",  // tipo fijo
-                    key              // ej: "LEFT", "RIGHT"...
-                );
-            } 
-            else if (strstr(input_str, "_PRESSED") != NULL) {
-                // Extrae solo la parte del key (sin _PRESSED)
->>>>>>> c50e311a2a21737eff6e49ef23a67af831791011
                 char key[20];
                 strncpy(key, input_str, strlen(input_str) - 8);
                 key[strlen(input_str) - 8] = '\0';
-                
-<<<<<<< HEAD
                 if (!enviar_input_al_servidor(CLIENT_PLAYER, partida_seleccionada_global,
                                              "KEY_PRESSED", key)) {
                     printf("❌ Error enviando input, servidor puede estar desconectado\n");
                     *estado_menu = MENU_MAIN;
                     return;
                 }
-=======
-                enviar_input_al_servidor(
-                    CLIENT_PLAYER, 
-                    partida_seleccionada_global,
-                    "KEY_PRESSED",   // tipo fijo  
-                    key              // ej: "LEFT", "RIGHT"...
-                );
->>>>>>> c50e311a2a21737eff6e49ef23a67af831791011
             }
         }
     }
@@ -144,9 +109,9 @@ void actualizar_modo_jugador(FrameInputs* inputs, EstadoMenu* estado_menu, Estad
     if (!procesar_respuesta_servidor(estado_juego)) {
         printf("⚠️  No se pudo procesar respuesta del servidor\n");
     }
-<<<<<<< HEAD
+
     
-=======
+
     /*
     // DEBUG: Mostrar posición del jugador cada 60 frames (≈1 segundo)
     if (frame_count++ % 60 == 0) {
@@ -155,17 +120,15 @@ void actualizar_modo_jugador(FrameInputs* inputs, EstadoMenu* estado_menu, Estad
                estado_juego->jugador.estado, estado_juego->jugador.vidas);
     }
     */
->>>>>>> c50e311a2a21737eff6e49ef23a67af831791011
     // Volver al menú si se presiona ESC
     if (inputs->escape_pressed) {
         printf("🎮 Saliendo de partida por ESC...\n");
         salir_partida_jugador(partida_seleccionada_global);
         set_partida_activa(false);
         *estado_menu = MENU_MAIN;
-<<<<<<< HEAD
-=======
+
+
         printf("=== VOLVIENDO AL MENU DESDE JUEGO ===\n");
->>>>>>> c50e311a2a21737eff6e49ef23a67af831791011
     }
 }
 
@@ -203,12 +166,8 @@ void actualizar_estado_espera(FrameInputs* inputs, EstadoMenu* estado_menu, Esta
             printf("GAME_CREATED recibido, enviando START_GAME...\n");
             if (confirmar_inicio_partida(partida_seleccionada_global)) {
                 start_game_enviado = true;
-<<<<<<< HEAD
                 intentos = 0;
-                printf("⏳ START_GAME enviado, esperando GAME_STARTED...\n");
-=======
-                printf("Esperando GAME_STARTED...\n");
->>>>>>> c50e311a2a21737eff6e49ef23a67af831791011
+                printf("START_GAME enviado, esperando GAME_STARTED...\n");
             }
         }
         else if (*estado_menu == MENU_JOINING_GAME) {
@@ -218,7 +177,6 @@ void actualizar_estado_espera(FrameInputs* inputs, EstadoMenu* estado_menu, Esta
         }
     }
     
-<<<<<<< HEAD
     // Reintentar enviar START_GAME si no hemos recibido confirmación
     if (*estado_menu == MENU_CREATING_GAME && start_game_enviado && 
         !esta_en_partida_activa() && intentos < 3) {
@@ -236,14 +194,7 @@ void actualizar_estado_espera(FrameInputs* inputs, EstadoMenu* estado_menu, Esta
         *estado_menu = MENU_PLAYING;
         start_game_enviado = false;
         intentos = 0;
-        printf("🎮 ¡Partida INICIADA como JUGADOR!\n");
-=======
-    //Si ya se envió START_GAME y la partida está activa, cambiar a modo JUGADOR
-    if (start_game_enviado && esta_en_partida_activa()) {
-        *estado_menu = MENU_PLAYING;
-        start_game_enviado = false;
         printf("¡Partida INICIADA como JUGADOR!\n");
->>>>>>> c50e311a2a21737eff6e49ef23a67af831791011
     }
     
     // Timeout después de 5 segundos
@@ -251,7 +202,7 @@ void actualizar_estado_espera(FrameInputs* inputs, EstadoMenu* estado_menu, Esta
     if (tiempo_inicio == 0) tiempo_inicio = ahora;
     
     if (ahora - tiempo_inicio > 5000) { // 5 segundos timeout
-        printf("❌ Timeout esperando inicio de partida\n");
+        printf("Timeout esperando inicio de partida\n");
         *estado_menu = MENU_MAIN;
         set_partida_activa(false);
         start_game_enviado = false;
@@ -264,13 +215,9 @@ void actualizar_estado_espera(FrameInputs* inputs, EstadoMenu* estado_menu, Esta
         *estado_menu = MENU_MAIN;
         set_partida_activa(false);
         start_game_enviado = false;
-<<<<<<< HEAD
         intentos = 0;
         tiempo_inicio = 0;
-        printf("❌ Cancelando conexión...\n");
-=======
-        printf("Cancelando conexion...\n");
->>>>>>> c50e311a2a21737eff6e49ef23a67af831791011
+        printf("Cancelando conexión...\n");
     }
 }
 // ==================== RENDERIZADO DE MENÚS ====================
