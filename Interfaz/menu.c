@@ -64,6 +64,7 @@ void actualizar_seleccion_partida(FrameInputs* inputs, EstadoMenu* estado_menu, 
 
 void actualizar_modo_jugador(FrameInputs* inputs, EstadoMenu* estado_menu, EstadoJuego* estado_juego) {
     // Enviar inputs al servidor
+    static int frame_count = 0;
     if (servidor_conectado && inputs->num_inputs > 0) {
         for (int i = 0; i < inputs->num_inputs; i++) {
             const char* input_str = inputs->inputs[i];
@@ -102,7 +103,14 @@ void actualizar_modo_jugador(FrameInputs* inputs, EstadoMenu* estado_menu, Estad
     if (servidor_conectado) {
         procesar_respuesta_servidor(estado_juego);
     }
-    
+    /*
+    // ✅ DEBUG: Mostrar posición del jugador cada 60 frames (≈1 segundo)
+    if (frame_count++ % 60 == 0) {
+        printf("🎮 DEBUG Jugador - X: %.1f, Y: %.1f, Estado: %d, Vidas: %d\n", 
+               estado_juego->jugador.x, estado_juego->jugador.y, 
+               estado_juego->jugador.estado, estado_juego->jugador.vidas);
+    }
+    */
     // Volver al menú si se presiona ESC
     if (inputs->escape_pressed) {
         salir_partida_jugador(partida_seleccionada_global);
@@ -111,6 +119,7 @@ void actualizar_modo_jugador(FrameInputs* inputs, EstadoMenu* estado_menu, Estad
         printf("=== VOLVIENDO AL MENÚ DESDE JUEGO ===\n");
     }
 }
+
 
 // ==================== ACTUALIZACIÓN MODO ESPECTADOR ====================
 
@@ -130,60 +139,38 @@ void actualizar_modo_espectador(FrameInputs* inputs, EstadoMenu* estado_menu, Es
 }
 
 void actualizar_estado_espera(FrameInputs* inputs, EstadoMenu* estado_menu, EstadoJuego* estado_juego) {
-    static int intentos = 0;
-    double tiempo_inicio = GetTime();
+    static bool start_game_enviado = false;
     
-    // Intentar procesar respuesta del servidor
+    // Procesar respuesta del servidor
     if (procesar_respuesta_servidor(estado_juego)) {
-        // Si recibimos GAME_STATE, cambiar al estado de juego
-        if (estado_juego->juego_activo) {
-            if (*estado_menu == MENU_CREATING_GAME) {
-                *estado_menu = MENU_PLAYING;
-                printf("¡Partida como JUGADOR iniciada!\n");
-            } else if (*estado_menu == MENU_JOINING_GAME) {
-                *estado_menu = MENU_SPECTATING;
-                printf("¡Partida como ESPECTADOR iniciada!\n");
+        if (*estado_menu == MENU_CREATING_GAME && !start_game_enviado) {
+            // Después de GAME_CREATED, enviar START_GAME
+            printf("✅ GAME_CREATED recibido, enviando START_GAME...\n");
+            if (confirmar_inicio_partida(partida_seleccionada_global)) {
+                start_game_enviado = true;
+                printf("⏳ Esperando GAME_STARTED...\n");
             }
-            intentos = 0;
-            return;
         }
-    }
-    
-    // También verificar si la partida está activa (por si acaso)
-    if (esta_en_partida_activa()) {
-        if (*estado_menu == MENU_CREATING_GAME) {
-            *estado_menu = MENU_PLAYING;
-            printf("¡Partida ACTIVADA - Cambiando a juego!\n");
-        } else if (*estado_menu == MENU_JOINING_GAME) {
+        else if (*estado_menu == MENU_JOINING_GAME) {
+            // Para espectador, directamente avanzar
             *estado_menu = MENU_SPECTATING;
-            printf("¡Partida ACTIVADA - Cambiando a espectador!\n");
+            printf("✅ ¡Unido como ESPECTADOR!\n");
         }
-        intentos = 0;
-        return;
     }
     
-    // Timeout después de 5 segundos
-    double tiempo_actual = GetTime();
-    if (tiempo_actual - tiempo_inicio > 5.0) {
-        printf("Timeout esperando confirmación del servidor\n");
-        *estado_menu = MENU_MAIN;
-        set_partida_activa(false);
-        intentos = 0;
-        return;
+    // Si ya enviamos START_GAME y recibimos confirmación, avanzar a juego
+    if (start_game_enviado && esta_en_partida_activa()) {
+        *estado_menu = MENU_PLAYING;
+        start_game_enviado = false;
+        printf("🎮 ¡Partida INICIADA como JUGADOR!\n");
     }
     
-    // Mostrar progreso cada segundo
-    intentos++;
-    if (intentos % 60 == 0) { // ~1 segundo a 60 FPS
-        printf("Esperando confirmación... (%.1f segundos)\n", tiempo_actual - tiempo_inicio);
-    }
-    
-    // Permitir cancelar con ESC
+    // Cancelar con ESC
     if (inputs->escape_pressed) {
         *estado_menu = MENU_MAIN;
         set_partida_activa(false);
-        printf("Cancelando conexión...\n");
-        intentos = 0;
+        start_game_enviado = false;
+        printf("❌ Cancelando conexión...\n");
     }
 }
 // ==================== RENDERIZADO DE MENÚS ====================

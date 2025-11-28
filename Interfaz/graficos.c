@@ -282,7 +282,6 @@ void dibujar_fondo(const SistemaSprites *sprites) {
 // ==================== RENDERIZADO PRINCIPAL ====================
 
 void dibujar_escena_completa(const EstadoJuego *estado, const SistemaSprites *sprites) {
-    BeginDrawing();
     
     // 1. Fondo (ahora desde sprites)
     dibujar_fondo(sprites);
@@ -314,7 +313,6 @@ void dibujar_escena_completa(const EstadoJuego *estado, const SistemaSprites *sp
         dibujar_hitboxes(estado);
     }
     
-    EndDrawing();
 }
 
 void dibujar_ui(const EstadoJuego *estado) {
