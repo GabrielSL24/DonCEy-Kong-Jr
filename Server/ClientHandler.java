@@ -33,8 +33,10 @@ public class ClientHandler implements Runnable {
     // Estado visual de animación (para el campo "state" del JSON)
     private String playerState = "STANDING";
 
-    // Id simple de la partida (ej. para espectadores/admin, a futuro)
-    private final String gameId = "partida_" + System.currentTimeMillis();
+    // Estado de la conexion
+     private String gameId = null;
+    private boolean gameStarted = false;
+    private boolean waitingForStart = false;
 
     public ClientHandler(Socket socket, SocketServidor server) {
         this.socket = socket;
@@ -77,6 +79,7 @@ public class ClientHandler implements Runnable {
                     break;
                 default:
                     System.out.println("Tipo de cliente desconocido: " + clientType);
+                    enviarError("TIPO_CLIENTE_DESCONOCIDO", "Tipo de cliente no válido: " + clientType);
             }
 
         } catch (Exception e) {
@@ -105,16 +108,19 @@ public class ClientHandler implements Runnable {
     private void handleJugador() throws IOException {
         System.out.println("Jugador " + clientId + " listo - INICIANDO PARTIDA: " + gameId);
 
+        socket.setSoTimeout(1000); // Timeout para no bloquear indefinidamente
+
+
         // Estado inicial tomando la lógica real
-        System.out.println("Enviando estado inicial al jugador " + clientId);
-        String jsonEstadoInicial = generarEstadoJuego();
-        adapter.sendString(jsonEstadoInicial);
-        System.out.println("Estado inicial enviado al jugador " + clientId);
+        //System.out.println("Enviando estado inicial al jugador " + clientId);
+        //String jsonEstadoInicial = generarEstadoJuego();
+        //adapter.sendString(jsonEstadoInicial);
+        //System.out.println("Estado inicial enviado al jugador " + clientId);
 
-        long ultimoEnvio = System.currentTimeMillis();
-        final long intervaloEnvioMs = 100; // ~10 FPS de estado
+        //long ultimoEnvio = System.currentTimeMillis();
+        //final long intervaloEnvioMs = 100; // ~10 FPS de estado
 
-        socket.setSoTimeout(50); // 50ms timeout
+        //socket.setSoTimeout(50); // 50ms timeout
 
         // Por ahora, no usamos estado global: el juego se considera siempre activo
         while (!socket.isClosed()) {
@@ -409,7 +415,7 @@ public class ClientHandler implements Runnable {
     }
 
     // =========================================================
-    //                   ESPECTADOR / ADMIN
+    //                   ESPECTADOR
     // =========================================================
 
     private void handleEspectador() throws IOException {
@@ -429,6 +435,10 @@ public class ClientHandler implements Runnable {
         }
     }
 
+    // =========================================================
+    //                       ADMIN
+    // =========================================================
+
     private void handleAdmin() throws IOException {
         System.out.println("Admin " + clientId + " conectado");
 
@@ -440,5 +450,9 @@ public class ClientHandler implements Runnable {
             System.out.println("Admin " + clientId + " envió comando: " + comando);
             adapter.sendInt(comando + 1000);
         }
+    }
+
+    public int getClientId() {
+        return clientId;
     }
 }

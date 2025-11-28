@@ -1,12 +1,12 @@
 import java.net.*;
 import java.io.*;
 import java.util.*;
-
 import javax.print.DocFlavor.STRING;
 
 
 public class SocketServidor {    
     private List<ClientHandler> clientes = new ArrayList<>();
+    //private Admin adminPanel;
 
     public static void main (String [] args) {
         new SocketServidor();
@@ -22,16 +22,23 @@ public class SocketServidor {
             System.out.println("- Otra PC: .\\cliente.exe 10.147.17.196");
             System.out.println("Esperando conexiones...");
 
+            //adminPanel = new Admin();
+
+
             while (true) {
                 Socket client = serverSocket.accept();
                 String clientIP = client.getInetAddress().getHostAddress();
                 System.out.println("🔗 Nuevo cliente conectado desde: " + clientIP);
                 
                 ClientHandler clientHandler = new ClientHandler(client, this);
-                clientes.add(clientHandler);
+                //clientes.add(clientHandler);
                 new Thread(clientHandler).start();
 
-                 System.out.println("🎯 Juegos activos: " + clientes.size());
+                //if (adminPanel != null) {
+                //    adminPanel.addClient(clientHandler.getClientId(), clientIP, "CONECTADO");
+                //}
+
+                //System.out.println("Juegos activos: " + clientes.size());
             }
         } catch (Exception e) {
             e.printStackTrace();
@@ -41,6 +48,14 @@ public class SocketServidor {
     public void removeClient(ClientHandler client) {
         clientes.remove(client);
         System.out.println("➖ Cliente desconectado. Juegos activos: " + clientes.size());
+
+        //if (adminPanel != null) {
+        //    adminPanel.removeClient(client.getClientId());
+        //}
     }
+
+    public List<ClientHandler> getClientes() {
+        return clientes;
+    }   
 }
 
