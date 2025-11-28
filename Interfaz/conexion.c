@@ -1,5 +1,4 @@
 #include "conexion.h"
-#include "game.h"
 #include "types.h"
 #include <stdio.h>
 #include <stdlib.h>
@@ -17,16 +16,54 @@
 #include <ws2tcpip.h>
 #pragma comment(lib, "ws2_32.lib")
 
+
+// ==================== DEFINICIÓN DE VARIABLES GLOBALES ====================
+bool servidor_conectado = false;
+InfoPartida partidas_disponibles[10];
+int cantidad_partidas = 0;
+EstadoMenu estado_menu_actual = MENU_MAIN;
+char partida_seleccionada_global[50] = "";
+
+// Variable para controlar estado de partida (EVITA SPAM)
+static bool partida_activa = false;
+static char* extraer_string_json(const char *json, const char *clave);
+static float extraer_float_json(const char *json, const char *clave);
+static int extraer_int_json(const char *json, const char *clave);
+static bool extraer_bool_json(const char *json, const char *clave);
+
 // Variables globales de conexión
 static SOCKET socket_servidor = INVALID_SOCKET;
-bool servidor_conectado = false;
 static WSADATA wsaData;
 
-// ==================== FUNCIONES DE CONEXIÓN ====================
+// ==================== INICIALIZACIÓN DE PARTIDAS DISPONIBLES ====================
+void inicializar_partidas_disponibles(void) {
+    cantidad_partidas = 0;
+    for (int i = 0; i < 10; i++) {
+        partidas_disponibles[i].game_id[0] = '\0';
+        partidas_disponibles[i].player_count = 0;
+        partidas_disponibles[i].spectators = 0;
+        partidas_disponibles[i].active = false;
+    }
+}
 
+// ==================== CONTROL DE PARTIDA ACTIVA ====================
+bool esta_en_partida_activa(void) {
+    return partida_activa;
+}
+
+void set_partida_activa(bool activa) {
+    partida_activa = activa;
+    printf("🎮 Partida %s\n", activa ? "ACTIVADA" : "DESACTIVADA");
+}
+
+// ==================== FUNCIONES DE CONEXIÓN ====================
 bool conectar_servidor(const char* ip) {
     printf("🔌 Conectando al servidor en %s:25557...\n", ip);
-    
+
+    inicializar_partidas_disponibles();
+    set_partida_activa(false); // Asegurar que empiece desactivada
+
+    // ... (el resto de la función conectar_servidor se mantiene igual)
     // Inicializar Winsock
     if (WSAStartup(MAKEWORD(2,2), &wsaData) != 0) {
         printf("❌ Error inicializando Winsock\n");
@@ -86,6 +123,7 @@ bool conectar_servidor(const char* ip) {
 
 void desconectar_servidor(void) {
     if (servidor_conectado) {
+        set_partida_activa(false); // Desactivar partida al desconectar
         closesocket(socket_servidor);
         WSACleanup();
         servidor_conectado = false;
@@ -93,9 +131,10 @@ void desconectar_servidor(void) {
     }
 }
 
+
 // ==================== FUNCIONES DE SERIALIZACIÓN JSON ====================
 
-bool serializar_input_a_json(TipoCliente client_type, int player_id, const char* game_id,
+bool serializar_input_a_json(TipoCliente client_type, const char* game_id,
                             const char* input_type, const char* key, PaqueteJSON *paquete) {
     // Crear JSON manualmente
     const char* client_type_str = (client_type == CLIENT_PLAYER) ? "PLAYER" : "SPECTATOR";
@@ -104,7 +143,7 @@ bool serializar_input_a_json(TipoCliente client_type, int player_id, const char*
     time_t timestamp = time(NULL);
     
     // Calcular tamaño necesario
-    size_t buffer_size = 256; // Tamaño base
+    size_t buffer_size = 300; // Aumentado por el nuevo campo
     if (game_id) buffer_size += strlen(game_id);
     if (key) buffer_size += strlen(key);
     
@@ -112,17 +151,17 @@ bool serializar_input_a_json(TipoCliente client_type, int player_id, const char*
     paquete->json_data = (char*)malloc(buffer_size);
     if (!paquete->json_data) return false;
     
-    // Formatear JSON
+    // Formatear JSON CON request_type
     snprintf(paquete->json_data, buffer_size,
         "{\n"
         "  \"client_type\": \"%s\",\n"
-        "  \"player_id\": %d,\n"
         "  \"game_id\": \"%s\",\n"
+        "  \"request_type\": \"GAME_INPUT\",\n"  // ← NUEVO CAMPO
         "  \"input_type\": \"%s\",\n"
         "  \"key\": \"%s\",\n"
         "  \"timestamp\": %lld\n" 
         "}",
-        client_type_str, player_id, game_id ? game_id : "default", 
+        client_type_str, game_id ? game_id : "default", 
         input_type, key ? key : "UNKNOWN", timestamp);
     
     paquete->json_size = strlen(paquete->json_data);
@@ -132,15 +171,15 @@ bool serializar_input_a_json(TipoCliente client_type, int player_id, const char*
 
 // ==================== FUNCIONES DE COMUNICACIÓN PRINCIPALES ====================
 
-bool enviar_input_al_servidor(TipoCliente client_type, int player_id, const char* game_id,
+bool enviar_input_al_servidor(TipoCliente client_type, const char* game_id,
                              const char* input_type, const char* key) {
-    if (!servidor_conectado) {
-        printf("⚠️  Servidor no conectado, input ignorado: %s\n", key);
+    if (!servidor_conectado || !partida_activa) {  // ← SOLO si partida activa
+        printf("⚠️  Servidor no conectado o partida no activa, input ignorado: %s\n", key);
         return false;
     }
     
     PaqueteJSON paquete;
-    if (!serializar_input_a_json(client_type, player_id, game_id, input_type, key, &paquete)) {
+    if (!serializar_input_a_json(client_type, game_id, input_type, key, &paquete)) {
         printf("❌ Error serializando input a JSON\n");
         return false;
     }
@@ -161,52 +200,44 @@ bool enviar_input_al_servidor(TipoCliente client_type, int player_id, const char
     printf("✅ Input enviado al servidor: %s - %s\n", input_type, key);
     return true;
 }
+// ==================== FUNCIONES DE HANDSHAKE ====================
 
-bool recibir_estado_actualizado(EstadoJuego *estado) {
-    if (!servidor_conectado) {
-        printf("⚠️  Servidor no conectado, no se puede recibir estado\n");
+bool confirmar_inicio_partida(const char* game_id) {
+    if (!servidor_conectado || !game_id) return false;
+    
+    time_t timestamp = time(NULL);
+    size_t buffer_size = 512;
+    char* json_data = (char*)malloc(buffer_size);
+    
+    if (!json_data) return false;
+    
+    snprintf(json_data, buffer_size,
+        "{\n"
+        "  \"client_type\": \"PLAYER\",\n"
+        "  \"request_type\": \"START_GAME\",\n"
+        "  \"game_id\": \"%s\",\n"
+        "  \"timestamp\": %lld\n"
+        "}",
+        game_id, (long long)timestamp);
+    
+    printf("📤 Confirmando inicio de partida: %s\n", json_data);
+    
+    // Enviar tamaño primero
+    adapter_send_int(socket_servidor, (int)strlen(json_data));
+    
+    // Enviar datos JSON
+    int bytes_sent = send(socket_servidor, json_data, (int)strlen(json_data), 0);
+    
+    free(json_data);
+    
+    if (bytes_sent == SOCKET_ERROR) {
+        printf("❌ Error confirmando inicio de partida\n");
         return false;
     }
     
-    printf("🔄 Esperando estado actualizado del servidor...\n");
-    
-    // Recibir tamaño del JSON
-    int json_size;
-    if (adapter_receive_int(socket_servidor, &json_size) <= 0) {
-        printf("❌ Error recibiendo tamaño del JSON\n");
-        return false;
-    }
-    
-    if (json_size <= 0 || json_size > 100000) { // Límite razonable
-        printf("❌ Tamaño de JSON inválido: %d\n", json_size);
-        return false;
-    }
-    
-    // Recibir datos JSON
-    char* json_buffer = (char*)malloc(json_size + 1);
-    if (!json_buffer) {
-        printf("❌ Error allocando memoria para JSON\n");
-        return false;
-    }
-    
-    int bytes_received = recv(socket_servidor, json_buffer, json_size, 0);
-    if (bytes_received != json_size) {
-        printf("❌ Error recibiendo datos JSON: %d/%d bytes\n", bytes_received, json_size);
-        free(json_buffer);
-        return false;
-    }
-    
-    json_buffer[json_size] = '\0'; // Null-terminate
-    printf("📥 JSON recibido (%d bytes)\n", json_size);
-    
-    // Deserializar JSON a estado
-    bool resultado = deserializar_json_a_estado(json_buffer, estado);
-    
-    free(json_buffer);
-    return resultado;
+    printf("✅ Inicio de partida confirmado: %s\n", game_id);
+    return true;
 }
-
-// ==================== PARSER JSON SIMPLIFICADO ====================
 
 // Función auxiliar para extraer valores string del JSON
 static char* extraer_string_json(const char *json, const char *clave) {
@@ -227,6 +258,88 @@ static char* extraer_string_json(const char *json, const char *clave) {
     
     return resultado;
 }
+
+bool procesar_respuesta_servidor(EstadoJuego *estado) {
+    if (!servidor_conectado) return false;
+    
+    // Recibir tamaño del JSON
+    int json_size;
+    if (adapter_receive_int(socket_servidor, &json_size) <= 0) {
+        return false;
+    }
+    
+    if (json_size <= 0 || json_size > 100000) return false;
+    
+    // Recibir datos JSON
+    char* json_buffer = (char*)malloc(json_size + 1);
+    if (!json_buffer) return false;
+    
+    int bytes_received = recv(socket_servidor, json_buffer, json_size, 0);
+    if (bytes_received != json_size) {
+        free(json_buffer);
+        return false;
+    }
+    
+    json_buffer[json_size] = '\0';
+    printf("📥 Mensaje del servidor (%d bytes): %s\n", json_size, json_buffer);
+    
+    // Determinar tipo de mensaje por response_type
+    const char* response_type = extraer_string_json(json_buffer, "response_type");
+    
+    if (response_type) {
+        printf("🔍 Tipo de respuesta: %s\n", response_type);
+        
+        if (strcmp(response_type, "GAME_LIST") == 0) {
+            printf("📋 Procesando lista de partidas...\n");
+            bool resultado = parsear_lista_partidas(json_buffer, partidas_disponibles, &cantidad_partidas);
+            free((void*)response_type);
+            free(json_buffer);
+            return resultado;
+        }
+        else if (strcmp(response_type, "GAME_CREATED") == 0 ||
+                 strcmp(response_type, "GAME_JOINED") == 0 ||
+                 strcmp(response_type, "GAME_STARTED") == 0 ||
+                 strcmp(response_type, "SPECTATOR_JOINED") == 0) {
+            printf("✅ Partida confirmada por servidor: %s\n", response_type);
+            set_partida_activa(true); // ← ACTIVAR PARTIDA SOLO AQUÍ
+            free((void*)response_type);
+            free(json_buffer);
+            return true;
+        }
+        else if (strcmp(response_type, "GAME_STATE") == 0) {
+            // Solo procesar estado del juego si la partida está activa
+            if (partida_activa) {
+                printf("🎮 Procesando estado del juego...\n");
+                bool resultado = deserializar_json_a_estado(json_buffer, estado);
+                free((void*)response_type);
+                free(json_buffer);
+                return resultado;
+            } else {
+                printf("⚠️  Ignorando GAME_STATE - partida no activa\n");
+                free((void*)response_type);
+                free(json_buffer);
+                return false;
+            }
+        }
+        else {
+            printf("❓ Respuesta no manejada: %s\n", response_type);
+            free((void*)response_type);
+        }
+    } else {
+        printf("⚠️  Mensaje sin response_type, ignorando\n");
+    }
+    
+    free(json_buffer);
+    return false;
+}
+
+bool recibir_estado_actualizado(EstadoJuego *estado) {
+    // Esta función ahora usa procesar_respuesta_servidor
+    return procesar_respuesta_servidor(estado);
+}
+
+
+// ==================== PARSER JSON SIMPLIFICADO ====================
 
 // Función auxiliar para extraer valores numéricos del JSON
 static float extraer_float_json(const char *json, const char *clave) {
@@ -393,4 +506,257 @@ void liberar_paquete_json(PaqueteJSON *paquete) {
         paquete->json_data = NULL;
         paquete->json_size = 0;
     }
+}
+
+// ==================== FUNCIONES  PARA ESPECTADOR ====================
+
+bool enviar_solicitud_espectador(TipoRequest request_type, const char* game_id) {
+    if (!servidor_conectado) {
+        printf("⚠️  Servidor no conectado\n");
+        return false;
+    }
+    
+    const char* request_type_str;
+    switch (request_type) {
+        case REQUEST_LIST_GAMES: request_type_str = "LIST_GAMES"; break;
+        case REQUEST_JOIN_GAME: request_type_str = "JOIN_GAME"; break;
+        case REQUEST_LEAVE_GAME: request_type_str = "LEAVE_GAME"; break;
+        default: return false;
+    }
+    
+    time_t timestamp = time(NULL);
+    size_t buffer_size = 512;
+    char* json_data = (char*)malloc(buffer_size);
+    
+    if (!json_data) return false;
+    
+    snprintf(json_data, buffer_size,
+        "{\n"
+        "  \"client_type\": \"SPECTATOR\",\n"
+        "  \"request_type\": \"%s\",\n"
+        "  \"game_id\": \"%s\",\n"
+        "  \"timestamp\": %lld\n"
+        "}",
+        request_type_str, game_id ? game_id : "", (long long)timestamp);
+    
+    printf("📤 JSON Espectador: %s\n", json_data);
+    
+    // Enviar tamaño primero
+    adapter_send_int(socket_servidor, (int)strlen(json_data));
+    
+    // Enviar datos JSON
+    int bytes_sent = send(socket_servidor, json_data, (int)strlen(json_data), 0);
+    
+    free(json_data);
+    
+    if (bytes_sent == SOCKET_ERROR) {
+        printf("❌ Error enviando solicitud de espectador\n");
+        return false;
+    }
+    
+    printf("✅ Solicitud de espectador enviada: %s\n", request_type_str);
+    return true;
+}
+
+bool solicitar_lista_partidas(void) {
+    return enviar_solicitud_espectador(REQUEST_LIST_GAMES, NULL);
+}
+
+bool unirse_partida_espectador(const char* game_id) {
+    if (!game_id) return false;
+    return enviar_solicitud_espectador(REQUEST_JOIN_GAME, game_id);
+}
+
+bool salir_partida_espectador(const char* game_id) {
+    if (!game_id) return false;
+    return enviar_solicitud_espectador(REQUEST_LEAVE_GAME, game_id);
+}
+
+bool parsear_lista_partidas(const char* json_str, InfoPartida partidas[], int* count) {
+    printf("🔧 Parseando lista de partidas...\n");
+    
+    // Buscar el array de games
+    const char* games_start = strstr(json_str, "\"games\"");
+    if (!games_start) {
+        printf("❌ No se encontró array de games en JSON\n");
+        return false;
+    }
+    
+    games_start = strchr(games_start, '[');
+    if (!games_start) return false;
+    games_start++; // Saltar '['
+    
+    int partida_count = 0;
+    const char* current = games_start;
+    
+    while (*current && *current != ']' && partida_count < 10) {
+        // Buscar cada objeto de partida entre { }
+        const char* obj_start = strchr(current, '{');
+        const char* obj_end = strchr(current, '}');
+        
+        if (!obj_start || !obj_end || obj_start > obj_end) break;
+        
+        // Extraer game_id
+        const char* id_start = strstr(obj_start, "\"game_id\"");
+        if (id_start && id_start < obj_end) {
+            id_start = strchr(id_start, '"');
+            if (id_start) id_start++;
+            const char* id_end = strchr(id_start, '"');
+            if (id_end && id_end < obj_end) {
+                strncpy(partidas[partida_count].game_id, id_start, id_end - id_start);
+                partidas[partida_count].game_id[id_end - id_start] = '\0';
+            }
+        }
+        
+        // Extraer player_count
+        const char* players_start = strstr(obj_start, "\"player_count\"");
+        if (players_start && players_start < obj_end) {
+            players_start = strchr(players_start, ':');
+            if (players_start) partidas[partida_count].player_count = atoi(players_start + 1);
+        }
+        
+        // Extraer spectators  
+        const char* specs_start = strstr(obj_start, "\"spectators\"");
+        if (specs_start && specs_start < obj_end) {
+            specs_start = strchr(specs_start, ':');
+            if (specs_start) partidas[partida_count].spectators = atoi(specs_start + 1);
+        }
+        
+        // Extraer active
+        const char* active_start = strstr(obj_start, "\"active\"");
+        if (active_start && active_start < obj_end) {
+            active_start = strchr(active_start, ':');
+            if (active_start) {
+                if (strstr(active_start, "true")) partidas[partida_count].active = true;
+                else partidas[partida_count].active = false;
+            }
+        }
+        
+        printf("🎮 Partida %d: %s (J:%d, E:%d, A:%s)\n",
+               partida_count, partidas[partida_count].game_id,
+               partidas[partida_count].player_count,
+               partidas[partida_count].spectators,
+               partidas[partida_count].active ? "SI" : "NO");
+        
+        partida_count++;
+        current = obj_end + 1;
+    }
+    
+    *count = partida_count;
+    return partida_count > 0;
+}
+
+bool crear_nueva_partida(const char* game_id) {
+    if (!servidor_conectado || !game_id) return false;
+    
+    time_t timestamp = time(NULL);
+    size_t buffer_size = 512;
+    char* json_data = (char*)malloc(buffer_size);
+    
+    if (!json_data) return false;
+    
+    snprintf(json_data, buffer_size,
+        "{\n"
+        "  \"client_type\": \"PLAYER\",\n"
+        "  \"request_type\": \"CREATE_GAME\",\n"
+        "  \"game_id\": \"%s\",\n"
+        "  \"timestamp\": %lld\n"
+        "}",
+        game_id, (long long)timestamp);
+    
+    printf("📤 Creando nueva partida: %s\n", json_data);
+    
+    // Enviar tamaño primero
+    adapter_send_int(socket_servidor, (int)strlen(json_data));
+    
+    // Enviar datos JSON
+    int bytes_sent = send(socket_servidor, json_data, (int)strlen(json_data), 0);
+    
+    free(json_data);
+    
+    if (bytes_sent == SOCKET_ERROR) {
+        printf("❌ Error creando partida\n");
+        return false;
+    }
+    
+    printf("✅ Partida creada: %s\n", game_id);
+    return true;
+}
+
+bool unirse_partida_jugador(const char* game_id) {
+    if (!servidor_conectado || !game_id) return false;
+    
+    time_t timestamp = time(NULL);
+    size_t buffer_size = 512;
+    char* json_data = (char*)malloc(buffer_size);
+    
+    if (!json_data) return false;
+    
+    snprintf(json_data, buffer_size,
+        "{\n"
+        "  \"client_type\": \"PLAYER\",\n"
+        "  \"request_type\": \"JOIN_GAME\",\n"
+        "  \"game_id\": \"%s\",\n"
+        "  \"timestamp\": %lld\n"
+        "}",
+        game_id, (long long)timestamp);
+    
+    printf("📤 Uniéndose a partida como jugador: %s\n", json_data);
+    
+    // Enviar tamaño primero
+    adapter_send_int(socket_servidor, (int)strlen(json_data));
+    
+    // Enviar datos JSON
+    int bytes_sent = send(socket_servidor, json_data, (int)strlen(json_data), 0);
+    
+    free(json_data);
+    
+    if (bytes_sent == SOCKET_ERROR) {
+        printf("❌ Error uniéndose a partida\n");
+        return false;
+    }
+    
+    printf("✅ Unido a partida como jugador: %s\n", game_id);
+    return true;
+}
+
+bool salir_partida_jugador(const char* game_id) {
+    if (!servidor_conectado || !game_id) return false;
+    
+    time_t timestamp = time(NULL);
+    size_t buffer_size = 512;
+    char* json_data = (char*)malloc(buffer_size);
+    
+    if (!json_data) return false;
+    
+    snprintf(json_data, buffer_size,
+        "{\n"
+        "  \"client_type\": \"PLAYER\",\n"
+        "  \"request_type\": \"LEAVE_GAME\",\n"
+        "  \"game_id\": \"%s\",\n"
+        "  \"timestamp\": %lld\n"
+        "}",
+        game_id, (long long)timestamp);
+    
+    printf("📤 Saliendo de partida como jugador: %s\n", json_data);
+    
+    // Enviar tamaño primero
+    adapter_send_int(socket_servidor, (int)strlen(json_data));
+    
+    // Enviar datos JSON
+    int bytes_sent = send(socket_servidor, json_data, (int)strlen(json_data), 0);
+    
+    free(json_data);
+    
+    if (bytes_sent == SOCKET_ERROR) {
+        printf("❌ Error saliendo de partida\n");
+        return false;
+    }
+    
+    printf("✅ Salido de partida como jugador: %s\n", game_id);
+    return true;
+}
+
+bool solicitar_actualizacion_lista_partidas(void) {
+    return solicitar_lista_partidas();  // Alias por ahora
 }

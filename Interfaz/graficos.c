@@ -2,6 +2,7 @@
 #include "config.h"
 #include <stdio.h>
 #include <string.h>
+#include "menu.h"
 
 SistemaSprites sprites_global;
 
@@ -393,5 +394,28 @@ void dibujar_hitboxes(const EstadoJuego *estado) {
                 YELLOW
             );
         }
+    }
+}
+
+void dibujar_interfaz_menu(EstadoMenu estado, int seleccion, InfoPartida partidas[], int count, const char* partida_actual) {
+    // ESTA FUNCIÓN SOLO SE LLAMA DESDE ESTADOS DE MENÚ
+    // NO desde estados de juego
+    
+    switch (estado) {
+        case MENU_MAIN:
+            dibujar_menu_principal(seleccion);
+            break;
+            
+        case MENU_SELECT_GAME:
+            dibujar_seleccion_partida(seleccion, partidas, count);
+            break;
+            
+        case MENU_PLAYING:
+            // EL HUD del jugador se dibuja en dibujar_ui() dentro de dibujar_escena_completa()
+            break;
+            
+        case MENU_SPECTATING:
+            // EL HUD del espectador se dibuja en dibujar_ui() dentro de dibujar_escena_completa()
+            break;
     }
 }
