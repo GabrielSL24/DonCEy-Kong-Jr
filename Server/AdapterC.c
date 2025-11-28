@@ -1,14 +1,13 @@
 #include "AdapterC.h"
 #include <stdio.h>
 
-// Incluir winsock2 SOLO en el .c, no en el .h
 #define WIN32_LEAN_AND_MEAN
 #include <winsock2.h>
 #include <ws2tcpip.h>
 #pragma comment(lib, "ws2_32.lib")
 
 int adapter_send_int(SOCKET socket, int value) {
-    //Convertir a formato de red
+    //Convierte el entero a formato de red y lo envia
     int network_value = htonl(value);
     int result = send(socket, (char*)&network_value, sizeof(network_value), 0);
     if (result > 0) {

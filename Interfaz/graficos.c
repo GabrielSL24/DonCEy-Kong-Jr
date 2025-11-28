@@ -48,7 +48,7 @@ void cargar_sprites(SistemaSprites *sprites) {
         printf("Cocodrilo azul cargado: %s\n", SPRITE_COCODRILO_AZUL);
     }
     
-    // FRUTAS - Mapear tipos a sprites disponibles
+    // FRUTAS 
     if (FileExists(SPRITE_FRUTA_PLATANO)) {
         sprites->fruta_banana.textura = LoadTexture(SPRITE_FRUTA_PLATANO);
         sprites->fruta_banana.cargado = true;
@@ -61,7 +61,7 @@ void cargar_sprites(SistemaSprites *sprites) {
         printf("Fruta apple cargada: %s\n", SPRITE_FRUTA_MANZANA);
     }
     
-    // Usar mismos sprites para tipos faltantes (temporal)
+    // PERAS y NARANJAS (reutilizan la misma imagen)
     if (FileExists(SPRITE_FRUTA_PERAS)) {
         sprites->fruta_pear.textura = LoadTexture(SPRITE_FRUTA_PERAS);
         sprites->fruta_pear.cargado = true;
@@ -258,7 +258,7 @@ void cargar_fondo(SistemaSprites *sprites) {
         printf("Fondo cargado: %s -> %dx%d\n", SPRITE_FONDO, SCREEN_WIDTH, SCREEN_HEIGHT);
     } else {
         sprites->fondo.cargado = false;
-        printf("No se encontró: %s\n", SPRITE_FONDO);
+        printf("No se encontro: %s\n", SPRITE_FONDO);
     }
 }
 
@@ -283,14 +283,14 @@ void dibujar_fondo(const SistemaSprites *sprites) {
 
 void dibujar_escena_completa(const EstadoJuego *estado, const SistemaSprites *sprites) {
     
-    // 1. Fondo (ahora desde sprites)
+    // 1. Fondo
     dibujar_fondo(sprites);
     
-    // 2. Elementos estáticos del juego
+    // 2. Elementos estaticos del juego
     dibujar_lianas(estado->lianas, estado->num_lianas);
     dibujar_plataformas(estado->plataformas, estado->num_plataformas);
     
-    // 3. Entidades dinámicas
+    // 3. Entidades dinamicas
     dibujar_padre(&estado->padre, sprites);
     
     for (int i = 0; i < estado->num_frutas; i++) {
@@ -301,13 +301,13 @@ void dibujar_escena_completa(const EstadoJuego *estado, const SistemaSprites *sp
         dibujar_cocodrilo(&estado->cocodrilos[i], sprites);
     }
     
-    // 4. Jugador (siempre encima)
+    // 4. Jugador
     dibujar_jugador(&estado->jugador, sprites);
     
     // 5. UI
     dibujar_ui(estado);
     
-    // 6. Debug (si está activado)
+    // 6. Debug (si esta activado)
     if (DEBUG_COLISIONES) {
         dibujar_debug_info(estado);
         dibujar_hitboxes(estado);
@@ -316,10 +316,10 @@ void dibujar_escena_completa(const EstadoJuego *estado, const SistemaSprites *sp
 }
 
 void dibujar_ui(const EstadoJuego *estado) {
-    // Título
+    // TTitulo
     DrawText("Donkey Kong Jr", 10, 10, 20, WHITE);
     
-    // Vidas y puntuación
+    // Vidas y puntuacion
     DrawText(TextFormat("Vidas: %d", estado->jugador.vidas), SCREEN_WIDTH - 150, 10, 20, WHITE);
     DrawText(TextFormat("Puntos: %d", estado->jugador.puntuacion), SCREEN_WIDTH - 300, 10, 20, WHITE);
     
@@ -334,7 +334,7 @@ void dibujar_ui(const EstadoJuego *estado) {
     }
     DrawText(TextFormat("Estado: %s", estado_str), 10, 40, 20, YELLOW);
     
-    // Posición del jugador
+    // Posicion del jugador
     DrawText(TextFormat("Pos: (%.0f, %.0f)", estado->jugador.x, estado->jugador.y), 
              SCREEN_WIDTH - 500, 10, 20, LIGHTGRAY);
     

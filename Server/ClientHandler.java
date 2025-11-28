@@ -5,8 +5,7 @@ import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.LinkedBlockingQueue;
 
 /**
- * Maneja la comunicación con UN cliente.
- * CORREGIDO: Eliminada lectura concurrente del socket
+ * Maneja la comunicacion con solo un cliente.
  */
 public class ClientHandler implements Runnable {
     private final Object socketLock = new Object();
@@ -25,7 +24,7 @@ public class ClientHandler implements Runnable {
     private boolean enPartida = false;
     private boolean esEspectador = false;
 
-    // Cola para comunicación entre hilos
+    // Cola para comunicacion entre hilos
     private final BlockingQueue<String> inputQueue = new LinkedBlockingQueue<>();
     private volatile boolean running = true;
 
@@ -36,7 +35,7 @@ public class ClientHandler implements Runnable {
         this.gameLogic = new GameLogic();
         this.currentInput = new PlayerInput(false, false, false, false, false);
         
-        System.out.println("🆕 NUEVO ClientHandler creado para cliente " + clientId);
+        System.out.println("NUEVO ClientHandler creado para cliente " + clientId);
     }
 
     @Override
@@ -51,25 +50,25 @@ public class ClientHandler implements Runnable {
             // 1. Enviar identificacion del servidor
             adapter.sendIdentification("SERVIDOR");
 
-            // 2. Recibir identificación del cliente
+            // 2. Recibir identificacion del cliente
             clientType = adapter.receiveIdentification();
             System.out.println("Cliente " + clientId + " es " + clientType);
 
-            // 3. Bucle principal - ÚNICO LUGAR DONDE SE LEE DEL SOCKET
+            // 3. Bucle principal - UNICO LUGAR DONDE SE LEE DEL SOCKET
             while (running && !socket.isClosed()) {
                 try {
                     if (adapter.hayDatosDisponibles()) {
                         String mensajeJson = leerMensajeSeguro();
                         
                         if (mensajeJson == null) {
-                            System.out.println("⚠️ Mensaje nulo recibido, ignorando");
+                            System.out.println("Mensaje nulo recibido, ignorando");
                             continue;
                         }
                         
-                        System.out.println("📥 Mensaje recibido del cliente " + clientId + ":");
+                        System.out.println("Mensaje recibido del cliente " + clientId + ":");
                         System.out.println("   " + mensajeJson.substring(0, Math.min(100, mensajeJson.length())));
 
-                        // Determinar tipo de mensaje
+                        // Determina tipo de mensaje
                         String requestType = extraerValor(mensajeJson, "request_type");
                         
                         if ("GAME_INPUT".equals(requestType) && enPartida) {
@@ -81,10 +80,10 @@ public class ClientHandler implements Runnable {
                         }
                     }
                     
-                    Thread.sleep(10); // Pequeña pausa
+                    Thread.sleep(10); // Pequena pausa
                     
                 } catch (Exception e) {
-                    System.out.println("❌ Error en bucle principal cliente " + clientId + ": " + e.getMessage());
+                    System.out.println("Error en bucle principal cliente " + clientId + ": " + e.getMessage());
                     if (e.getMessage() != null && e.getMessage().contains("Socket closed")) {
                         break;
                     }
@@ -100,29 +99,29 @@ public class ClientHandler implements Runnable {
     }
 
     /**
-     * Método seguro para leer mensajes del socket CON VALIDACIÓN
+     * Metodo seguro para leer mensajes del socket CON VALIDACION
      */
     private String leerMensajeSeguro() {
         synchronized (socketLock) {
             try {
                 String mensaje = adapter.receiveString();
                 
-                // Validación básica
+                // Validacion basica
                 if (mensaje == null || mensaje.isEmpty()) {
                     return null;
                 }
                 
-                // Verificar que sea JSON válido (comienza con '{' y termina con '}')
+                // Verifica que sea JSON valido (comienza con '{' y termina con '}')
                 String trimmed = mensaje.trim();
                 if (!trimmed.startsWith("{") || !trimmed.endsWith("}")) {
-                    System.out.println("⚠️ Mensaje no parece JSON válido: " + trimmed.substring(0, Math.min(50, trimmed.length())));
+                    System.out.println("Mensaje no parece JSON valido: " + trimmed.substring(0, Math.min(50, trimmed.length())));
                     return null;
                 }
                 
                 return mensaje;
                 
             } catch (IOException e) {
-                System.out.println("❌ Error leyendo mensaje: " + e.getMessage());
+                System.out.println("Error leyendo mensaje: " + e.getMessage());
                 running = false;
                 return null;
             }
@@ -163,7 +162,7 @@ public class ClientHandler implements Runnable {
             } else if ("SPECTATOR".equals(clientType)) {
                 procesarMensajeEspectador(requestType, gameId, mensajeJson);
             } else {
-                enviarError("CLIENT_TYPE_INVALID", "Tipo de cliente no válido: " + clientType);
+                enviarError("CLIENT_TYPE_INVALID", "Tipo de cliente no valido: " + clientType);
             }
         } catch (Exception e) {
             System.out.println("Error procesando mensaje: " + e.getMessage());
@@ -173,7 +172,7 @@ public class ClientHandler implements Runnable {
     }
 
     private void procesarMensajeJugador(String requestType, String gameId, String mensajeJson) {
-        System.out.println("🎯 Procesando mensaje jugador: " + requestType + " para partida: " + gameId);
+        System.out.println("Procesando mensaje jugador: " + requestType + " para partida: " + gameId);
         
         switch (requestType) {
             case "CREATE_GAME":
@@ -183,18 +182,18 @@ public class ClientHandler implements Runnable {
                 unirJugadorAPartida(gameId);
                 break;
             case "START_GAME":
-                System.out.println("🚀 START_GAME recibido, iniciando partida...");
+                System.out.println("START_GAME recibido, iniciando partida...");
                 iniciarPartida(gameId);
                 break;
             case "LEAVE_GAME":
                 salirDePartida();
                 break;
             case "GAME_INPUT":
-                // NO procesar aquí - se procesa en el bucle de juego
-                System.out.println("⚠️ GAME_INPUT recibido fuera del bucle de juego - ignorando");
+                // NO procesar aqui - se procesa en el bucle de juego
+                System.out.println("GAME_INPUT recibido fuera del bucle de juego - ignorando");
                 break;
             default:
-                enviarError("REQUEST_INVALID", "Tipo de request no válido: " + requestType);
+                enviarError("REQUEST_INVALID", "Tipo de request no valido: " + requestType);
         }
     }
 
@@ -210,7 +209,7 @@ public class ClientHandler implements Runnable {
                 salirDePartida();
                 break;
             default:
-                enviarError("REQUEST_INVALID", "Tipo de request no válido: " + requestType);
+                enviarError("REQUEST_INVALID", "Tipo de request no valido: " + requestType);
         }
     }
 
@@ -218,11 +217,11 @@ public class ClientHandler implements Runnable {
 
     private void crearPartidaJugador(String gameIdSolicitado) {
         try {
-            System.out.println("🎯 SOLICITUD CREAR PARTIDA: " + gameIdSolicitado);
+            System.out.println("SOLICITUD CREAR PARTIDA: " + gameIdSolicitado);
             
             String gameIdFinal = server.crearPartida(this);
             
-            System.out.println("✅ PARTIDA ASIGNADA: " + gameIdFinal);
+            System.out.println("PARTIDA ASIGNADA: " + gameIdFinal);
             this.gameId = gameIdFinal;
             this.enPartida = true;
             this.esEspectador = false;
@@ -232,28 +231,28 @@ public class ClientHandler implements Runnable {
             SocketServidor.Partida partida = server.obtenerPartida(gameIdFinal);
             
             if (partida == null) {
-                System.out.println("❌ ERROR: Partida no encontrada después de crearla!");
+                System.out.println("ERROR: Partida no encontrada despues de crearla!");
                 Thread.sleep(200);
                 partida = server.obtenerPartida(gameIdFinal);
                 
                 if (partida == null) {
-                    System.out.println("❌ ERROR CRÍTICO: Partida sigue sin existir después de 2 intentos");
+                    System.out.println("ERROR CRITICO: Partida sigue sin existir despues de 2 intentos");
                     enviarError("GAME_CREATION_FAILED", "Error interno del servidor");
                     return;
                 }
             }
             
-            System.out.println("✅ PARTIDA CONFIRMADA EN SERVIDOR");
+            System.out.println("PARTIDA CONFIRMADA EN SERVIDOR");
             
             String respuesta = String.format(
                 "{\"response_type\":\"GAME_CREATED\",\"game_id\":\"%s\",\"timestamp\":%d,\"status\":\"SUCCESS\",\"message\":\"Partida creada exitosamente\"}",
                 gameIdFinal, System.currentTimeMillis());
                 
             enviarMensajeSeguro(respuesta);
-            System.out.println("✅ Confirmación GAME_CREATED enviada al cliente");
+            System.out.println("Confirmacion GAME_CREATED enviada al cliente");
             
         } catch (Exception e) {
-            System.out.println("❌ Error creando partida: " + e.getMessage());
+            System.out.println("Error creando partida: " + e.getMessage());
             e.printStackTrace();
             enviarError("GAME_CREATION_FAILED", "Error: " + e.getMessage());
         }
@@ -283,18 +282,18 @@ public class ClientHandler implements Runnable {
 
     private void iniciarPartida(String gameId) {
         try {
-            System.out.println("🚀 SOLICITUD INICIAR PARTIDA: " + gameId);
+            System.out.println("SOLICITUD INICIAR PARTIDA: " + gameId);
             
             SocketServidor.Partida partida = server.obtenerPartida(gameId);
             
             if (partida == null) {
-                System.out.println("❌ PARTIDA NO ENCONTRADA: " + gameId);
+                System.out.println("PARTIDA NO ENCONTRADA: " + gameId);
                 enviarError("GAME_START_FAILED", "Partida no encontrada: " + gameId);
                 return;
             }
             
             if (partida.jugador != this) {
-                System.out.println("❌ JUGADOR NO COINCIDE");
+                System.out.println("JUGADOR NO COINCIDE");
                 enviarError("GAME_START_FAILED", "No eres el jugador de esta partida");
                 return;
             }
@@ -306,7 +305,7 @@ public class ClientHandler implements Runnable {
                 gameId, System.currentTimeMillis());
             enviarMensajeSeguro(respuesta);
             
-            System.out.println("🎮 Partida INICIADA: " + gameId + " para jugador " + clientId);
+            System.out.println("Partida INICIADA: " + gameId + " para jugador " + clientId);
             
             // Iniciar bucle de juego en hilo separado
             Thread gameThread = new Thread(this::bucleJuegoJugador);
@@ -314,10 +313,10 @@ public class ClientHandler implements Runnable {
             gameThread.setName("GameLoop-" + clientId);
             gameThread.start();
             
-            System.out.println("🔄 Bucle de juego iniciado en hilo separado");
+            System.out.println("Bucle de juego iniciado en hilo separado");
             
         } catch (Exception e) {
-            System.out.println("❌ Error iniciando partida: " + e.getMessage());
+            System.out.println("Error iniciando partida: " + e.getMessage());
             e.printStackTrace();
             enviarError("GAME_START_FAILED", "Error iniciando partida: " + e.getMessage());
         }
@@ -327,11 +326,11 @@ public class ClientHandler implements Runnable {
 
     private void bucleJuegoJugador() {
         try {
-            System.out.println("🎮 INICIANDO BUCLE DE JUEGO para jugador " + clientId);
+            System.out.println("INICIANDO BUCLE DE JUEGO para jugador " + clientId);
             SocketServidor.Partida partida = server.obtenerPartida(gameId);
             
             if (partida == null) {
-                System.out.println("❌ Partida no encontrada: " + gameId);
+                System.out.println("Partida no encontrada: " + gameId);
                 return;
             }
             
@@ -350,30 +349,30 @@ public class ClientHandler implements Runnable {
                         procesarInput(jsonInput);
                     }
                     
-                    // 2) Actualizar lógica del juego
+                    // 2) Actualizar logica del juego
                     partida.logica.update(currentInput);
                     
-                    // 3) Enviar estado periódicamente
+                    // 3) Enviar estado periodicamente
                     if (ahora - ultimoEnvioLocal >= intervaloEnvioMsLocal) {
                         String jsonEstado = generarEstadoJuego(partida.logica);
                         enviarMensajeSeguro(jsonEstado);
                         ultimoEnvioLocal = ahora;
                         
                         if (frameCount % 20 == 0) {
-                            System.out.println("📤 Estado enviado (frame " + frameCount + ")");
+                            System.out.println("Estado enviado (frame " + frameCount + ")");
                         }
                     }
                     
                     Thread.sleep(10);
                 } catch (Exception e) {
-                    System.out.println("❌ Error en bucle de juego: " + e.getMessage());
+                    System.out.println("Error en bucle de juego: " + e.getMessage());
                     break;
                 }
             }
             
-            System.out.println("🛑 Bucle de juego terminado");
+            System.out.println("Bucle de juego terminado");
         } catch (Exception e) {
-            System.out.println("❌ Error en bucle de juego: " + e.getMessage());
+            System.out.println("Error en bucle de juego: " + e.getMessage());
             e.printStackTrace();
         }
     }
@@ -414,7 +413,7 @@ public class ClientHandler implements Runnable {
     }
 
     /**
-     * Método sincronizado para enviar mensajes
+     * Metodo sincronizado para enviar mensajes
      */
     private void enviarMensajeSeguro(String mensaje) {
         synchronized (socketLock) {
@@ -423,7 +422,7 @@ public class ClientHandler implements Runnable {
                     adapter.sendString(mensaje);
                 }
             } catch (IOException e) {
-                System.out.println("❌ Error enviando mensaje: " + e.getMessage());
+                System.out.println("Error enviando mensaje: " + e.getMessage());
                 running = false;
             }
         }
@@ -513,9 +512,9 @@ public class ClientHandler implements Runnable {
                     currentGameId, System.currentTimeMillis());
                     
                 enviarMensajeSeguro(respuesta);
-                System.out.println("✅ Confirmación de salida enviada para partida: " + currentGameId);
+                System.out.println("Confirmacion de salida enviada para partida: " + currentGameId);
             } catch (Exception e) {
-                System.out.println("Error enviando confirmación de salida: " + e.getMessage());
+                System.out.println("Error enviando confirmacion de salida: " + e.getMessage());
             }
             
             gameId = null;
@@ -542,7 +541,7 @@ public class ClientHandler implements Runnable {
             String inputType = extraerValor(jsonInput, "input_type");
             String key = extraerValor(jsonInput, "key");
 
-            System.out.println("🎮 Procesando input: " + inputType + " - " + key);
+            System.out.println("Procesando input: " + inputType + " - " + key);
 
             boolean pressed = "KEY_PRESSED".equals(inputType);
 
@@ -587,17 +586,17 @@ public class ClientHandler implements Runnable {
 
             currentInput = new PlayerInput(left, right, up, down, jump);
 
-            System.out.println("🔄 Input actualizado - L:" + left + " R:" + right + 
+            System.out.println("Input actualizado - L:" + left + " R:" + right + 
                         " U:" + up + " D:" + down + " J:" + jump + 
                         " State:" + playerState);
 
         } catch (Exception e) {
-            System.out.println("❌ Error procesando input JSON: " + e.getMessage());
+            System.out.println("Error procesando input JSON: " + e.getMessage());
             e.printStackTrace();
         }
     }
 
-    // ==================== GENERACIÓN DE ESTADO ====================
+    // ==================== GENERACION DE ESTADO ====================
 
     private String generarEstadoJuego(GameLogic gameLogic) {
         StringBuilder json = new StringBuilder();

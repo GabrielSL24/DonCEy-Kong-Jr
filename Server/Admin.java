@@ -169,17 +169,16 @@ public class Admin {
             SocketServidor.Partida partida = server.obtenerPartida(gameId);
             
             if (partida != null && partida.logica != null) {
-                // CORREGIDO: Usar directamente el ID de la liana (0-8)
                 boolean exito = partida.logica.adminSpawnFruitOnVine(idLiana, offsetY, puntos);
                 
                 if (exito) {
-                    areaLog.append(String.format("✅ Fruta creada en Liana %d, offsetY %d, %d puntos\n", 
+                    areaLog.append(String.format("Fruta creada en Liana %d, offsetY %d, %d puntos\n", 
                         idLiana, offsetY, puntos));
                 } else {
-                    areaLog.append(String.format("❌ Error creando fruta en Liana %d (offsetY fuera de rango o liana no existe)\n", idLiana));
+                    areaLog.append(String.format("Error creando fruta en Liana %d (offsetY fuera de rango o liana no existe)\n", idLiana));
                 }
             } else {
-                areaLog.append("❌ Partida no encontrada o lógica no disponible\n");
+                areaLog.append("Partida no encontrada o lógica no disponible\n");
             }
         } catch (NumberFormatException ex) {
             JOptionPane.showMessageDialog(null, "Ingrese valores numéricos válidos para puntos y altura");
@@ -218,12 +217,12 @@ public class Admin {
                 }
                 
                 if (exito) {
-                    areaLog.append(String.format("✅ Cocodrilo %s creado en Liana %d\n", tipo, idLiana));
+                    areaLog.append(String.format("Cocodrilo %s creado en Liana %d\n", tipo, idLiana));
                 } else {
-                    areaLog.append(String.format("❌ Error creando cocodrilo %s en Liana %d (ya existe un cocodrilo vivo en esa liana)\n", tipo, idLiana));
+                    areaLog.append(String.format("Error creando cocodrilo %s en Liana %d (ya existe un cocodrilo vivo en esa liana)\n", tipo, idLiana));
                 }
             } else {
-                areaLog.append("❌ Partida no encontrada o lógica no disponible\n");
+                areaLog.append("Partida no encontrada o lógica no disponible\n");
             }
         } catch (Exception ex) {
             areaLog.append("Error creando cocodrilo: " + ex.getMessage() + "\n");
@@ -245,7 +244,7 @@ public class Admin {
         }
 
         try {
-            // Extraer el ID de la liana (0-8)
+            // Extrae el ID de la liana (0-8)
             int idLiana = Integer.parseInt(lianaSeleccionada.split(" ")[1]);
             int offsetY = Integer.parseInt(txtAlturaFruta.getText());
             
@@ -253,7 +252,6 @@ public class Admin {
             SocketServidor.Partida partida = server.obtenerPartida(gameId);
             
             if (partida != null && partida.logica != null) {
-                // CORREGIDO: Usar directamente el ID de la liana
                 Integer fruitId = partida.logica.buscarIdFruta(idLiana, offsetY);
                 boolean exito = false;
                 
@@ -262,14 +260,14 @@ public class Admin {
                 }
                 
                 if (exito) {
-                    areaLog.append(String.format("✅ Fruta eliminada de Liana %d, offsetY %d\n", 
+                    areaLog.append(String.format("Fruta eliminada de Liana %d, offsetY %d\n", 
                         idLiana, offsetY));
                 } else {
-                    areaLog.append(String.format("❌ No se encontró fruta activa en Liana %d, offsetY %d\n", 
+                    areaLog.append(String.format("No se encontro fruta activa en Liana %d, offsetY %d\n", 
                         idLiana, offsetY));
                 }
             } else {
-                areaLog.append("❌ Partida no encontrada o lógica no disponible\n");
+                areaLog.append("Partida no encontrada o lógica no disponible\n");
             }
         } catch (NumberFormatException ex) {
             JOptionPane.showMessageDialog(null, "Ingrese una altura numérica válida");

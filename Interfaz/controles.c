@@ -31,7 +31,7 @@ const char* obtener_input_presionado(const Controles *ctrl) {
     if (IsKeyPressed(KEY_DOWN)) return "DOWN_PRESSED";
     if (IsKeyPressed(KEY_SPACE)) return "JUMP_PRESSED";
     
-    // También detectar releases para movimiento más preciso
+    // Tambien detectar releases para movimiento más preciso
     if (IsKeyReleased(KEY_LEFT)) return "LEFT_RELEASED";
     if (IsKeyReleased(KEY_RIGHT)) return "RIGHT_RELEASED";
     if (IsKeyReleased(KEY_UP)) return "UP_RELEASED";
@@ -42,8 +42,8 @@ const char* obtener_input_presionado(const Controles *ctrl) {
 }
 
 void limpiar_controles(Controles *ctrl) {
-    // Por ahora no es necesario limpiar, pero se mantiene la interfaz
-    // para futuras extensiones (como input buffering)
+    //de momento no es necesario limpiar
+    // para futura implementacion (como input buffering)
 }
 
 // ==================== FUNCIONES DE CONSULTA DIRECTA ====================
@@ -71,15 +71,14 @@ bool tecla_espacio_presionada(void) {
 // ==================== DETECCIÓN POR FRAME (USANDO FrameInputs DEFINIDO) ====================
 
 void detectar_inputs_frame(FrameInputs *frame_inputs) {
-    // Inicializar el frame
+    // Inicializa el frame
     frame_inputs->num_inputs = 0;
     frame_inputs->enter_pressed = false;
     frame_inputs->escape_pressed = false;
     frame_inputs->backspace_pressed = false;
     frame_inputs->seleccion_menu = 0;
-    
-    // ✅ CORREGIDO: Usar solo KEY_PRESSED y KEY_RELEASED
-    // KEY PRESSED (solo cuando se presiona por primera vez)
+
+
     if (IsKeyPressed(KEY_LEFT)) {
         strcpy(frame_inputs->inputs[frame_inputs->num_inputs++], "LEFT_PRESSED");
     }
@@ -113,12 +112,12 @@ void detectar_inputs_frame(FrameInputs *frame_inputs) {
         strcpy(frame_inputs->inputs[frame_inputs->num_inputs++], "JUMP_RELEASED");
     }
     
-    // Inputs para menú (se mantienen igual)
+    // Inputs para menu
     frame_inputs->enter_pressed = IsKeyPressed(KEY_ENTER);
     frame_inputs->escape_pressed = IsKeyPressed(KEY_ESCAPE);
     frame_inputs->backspace_pressed = IsKeyPressed(KEY_BACKSPACE);
     
-    // Navegación en menú
+    // Navegacion en menu
     if (IsKeyPressed(KEY_UP)) {
         frame_inputs->seleccion_menu = -1;
     }
@@ -128,7 +127,7 @@ void detectar_inputs_frame(FrameInputs *frame_inputs) {
     
     // Debug
     if (frame_inputs->num_inputs > 0) {
-        printf("🎮 Inputs detectados: ");
+        printf("Inputs detectados: ");
         for (int i = 0; i < frame_inputs->num_inputs; i++) {
             printf("%s ", frame_inputs->inputs[i]);
         }

@@ -18,7 +18,7 @@ void inicializar_estado_default(EstadoJuego *estado) {
     printf("Inicializando estado por defecto\n");
     memset(estado, 0, sizeof(EstadoJuego));
     
-    // Jugador
+    // Inicializar jugador
     estado->jugador.x = 100.0f;
     estado->jugador.y = 500.0f;
     estado->jugador.vidas = 3;
@@ -28,6 +28,7 @@ void inicializar_estado_default(EstadoJuego *estado) {
     // ==================== INICIALIZAR LIANAS ====================
     estado->num_lianas = 9;
     
+    // Configurar posiciones de las lianas
     estado->lianas[0].x = 40;
     estado->lianas[0].y_inicio = 80;
     estado->lianas[0].y_fin = 480;
@@ -115,7 +116,7 @@ void inicializar_estado_default(EstadoJuego *estado) {
     estado->padre.y = 2 * 20 + 20 / 2;
     estado->padre.activo = true;
     
-    printf("✅ Estado inicializado:\n");
+    printf("Estado inicializado:\n");
     printf("   - Lianas: %d\n", estado->num_lianas);
     printf("   - Plataformas: %d\n", estado->num_plataformas);
     printf("   - Padre en: (%.1f, %.1f)\n", estado->padre.x, estado->padre.y);
@@ -125,7 +126,7 @@ int main(void) {
     EstadoJuego estado_juego;
     FrameInputs inputs_frame;
     
-    // Inicialización
+    // Inicializacion de sistemas
     inicializar_graficos();
     inicializar_estado_default(&estado_juego);
     
@@ -133,15 +134,15 @@ int main(void) {
     printf("   - Pantalla: %dx%d\n", SCREEN_WIDTH, SCREEN_HEIGHT);
     printf("   - FPS: %d\n", FPS);
     
-    // Conexión al servidor
+    // Conexion al servidor
     if(!conectar_servidor("127.0.0.1")) {
-        printf("⚠️ Modo local activado (sin servidor)\n");
-        printf("⚠️ No se podrá jugar sin servidor\n");
+        printf("Modo local activado (sin servidor)\n");
+        printf("No se podra jugar sin servidor\n");
     } else {
-        printf("✅ Conectado al servidor\n");
+        printf("Conectado al servidor\n");
     }
 
-    // Variables para estado de la aplicación
+    // Variables para estado de la aplicacion
     EstadoMenu estado_menu = MENU_MAIN;
     int seleccion_actual = 0;
     
@@ -150,7 +151,7 @@ int main(void) {
     double tiempo_transicion = 0;
     const double DURACION_TRANSICION = 3.0; // 3 segundos
     
-    // Variables previas de juego
+    // Variables previas de juego para detectar cambios
     int vidas_previas = 3;
     float distancia_previa_padre = 1000.0f;
     
@@ -158,19 +159,19 @@ int main(void) {
     while (!WindowShouldClose()) {
         double tiempo_actual = GetTime();
         
-        // 1. DETECTAR INPUTS (siempre)
+        // 1. DETECTAR INPUTS (siempre se procesan)
         detectar_inputs_frame(&inputs_frame);
         
-        // 2. VERIFICAR CONDICIONES DE FIN DE JUEGO (solo en MENU_PLAYING)
+        // 2. VERIFICAR CONDICIONES DE FIN DE JUEGO (solo en modo jugador activo)
         if (estado_menu == MENU_PLAYING && transicion_actual == TRANSITION_NONE) {
-            // Verificar GAME OVER
+            // Verificar GAME OVER por vidas agotadas
             if (estado_juego.jugador.vidas <= 0 && vidas_previas > 0) {
-                printf("💀 GAME OVER - Sin vidas\n");
+                printf("GAME OVER - Sin vidas\n");
                 transicion_actual = TRANSITION_GAME_OVER;
                 tiempo_transicion = tiempo_actual;
             }
             
-            // Verificar VICTORIA
+            // Verificar VICTORIA por alcanzar al padre
             float distancia_al_padre = sqrt(
                 pow(estado_juego.jugador.x - estado_juego.padre.x, 2) +
                 pow(estado_juego.jugador.y - estado_juego.padre.y, 2)
@@ -181,33 +182,40 @@ int main(void) {
             if (distancia_al_padre <= DISTANCIA_VICTORIA && 
                 distancia_previa_padre > DISTANCIA_VICTORIA &&
                 estado_juego.padre.activo) {
-                printf("🎉 ¡VICTORIA! - Llegaste donde tu padre\n");
+                printf("VICTORIA - Llegaste donde tu padre\n");
                 transicion_actual = TRANSITION_VICTORIA;
                 tiempo_transicion = tiempo_actual;
             }
             
+            // Actualizar valores previos para siguiente frame
             vidas_previas = estado_juego.jugador.vidas;
             distancia_previa_padre = distancia_al_padre;
         }
         
-        // 3. MANEJAR TRANSICIONES
+        // 3. MANEJAR TRANSICIONES DE ESTADO
         if (transicion_actual != TRANSITION_NONE) {
             double tiempo_transcurrido = tiempo_actual - tiempo_transicion;
             
+            // Comprobar si la transicion ha terminado
             if (tiempo_transcurrido >= DURACION_TRANSICION) {
-                // Fin de transición - volver al menú
-                salir_partida_jugador(partida_seleccionada_global);
-                set_partida_activa(false);
-                estado_menu = MENU_MAIN;
+                // Solo salir si es GAME OVER, no en victoria
+                if (transicion_actual == TRANSITION_GAME_OVER) {
+                    salir_partida_jugador(partida_seleccionada_global);
+                    set_partida_activa(false);
+                    estado_menu = MENU_MAIN;
+                    printf("Volviendo al menu principal\n");
+                } else if (transicion_actual == TRANSITION_VICTORIA) {
+                    // Solo limpia la transicion, seguir jugando
+                    printf("Continuando al siguiente nivel\n");
+                }
                 transicion_actual = TRANSITION_NONE;
                 seleccion_actual = 0;
-                vidas_previas = 3;
+                vidas_previas = estado_juego.jugador.vidas; // Mantener las vidas actuales
                 distancia_previa_padre = 1000.0f;
-                printf("🔙 Volviendo al menú principal\n");
             }
         }
         
-        // 4. MÁQUINA DE ESTADOS - ACTUALIZACIÓN (solo si no hay transición)
+        // 4. MAQUINA DE ESTADOS - ACTUALIZACION (solo si no hay transicion activa)
         if (transicion_actual == TRANSITION_NONE) {
             switch (estado_menu) {
                 case MENU_MAIN:
@@ -233,12 +241,12 @@ int main(void) {
             }
         }
         
-        // 5. MÁQUINA DE ESTADOS - RENDERIZADO
+        // 5. MAQUINA DE ESTADOS - RENDERIZADO
         BeginDrawing();
         
-        // Renderizar según transición o estado
+        // Renderizar segun transicion o estado normal
         if (transicion_actual != TRANSITION_NONE) {
-            // Mostrar pantalla de transición sobre el juego
+            // Mostrar pantalla de transicion sobre el juego
             dibujar_escena_completa(&estado_juego, &sprites_global);
             
             if (transicion_actual == TRANSITION_GAME_OVER) {
@@ -247,7 +255,7 @@ int main(void) {
                 dibujar_pantalla_victoria();
             }
         } else {
-            // Renderizado normal según estado
+            // Renderizado normal segun estado del menu
             switch (estado_menu) {
                 case MENU_MAIN:
                     ClearBackground(BLACK);
@@ -284,8 +292,9 @@ int main(void) {
         EndDrawing();
     }
     
-    // Limpieza
+    // Limpieza y cierre de sistemas
     if (servidor_conectado) {
+        // Salir correctamente de la partida segun el modo actual
         if (estado_menu == MENU_SPECTATING) {
             salir_partida_espectador(partida_seleccionada_global);
         } else if (estado_menu == MENU_PLAYING) {

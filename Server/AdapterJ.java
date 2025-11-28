@@ -50,7 +50,7 @@ public class AdapterJ {
             
             // Validaciones más estrictas
             if (length <= 0) {
-                throw new IOException("Tamaño de string inválido (<= 0): " + length);
+                throw new IOException("Tamaño de string invalido (<= 0): " + length);
             }
             if (length > 1024 * 1024) { // Máximo 1MB
                 throw new IOException("Tamaño de string demasiado grande: " + length);
@@ -67,13 +67,13 @@ public class AdapterJ {
             while (totalRead < length) {
                 int bytesRead = input.read(bytes, totalRead, length - totalRead);
                 if (bytesRead == -1) {
-                    throw new IOException("Conexión cerrada mientras se leía string");
+                    throw new IOException("Conexion cerrada mientras se leia string");
                 }
                 totalRead += bytesRead;
                 
                 // Timeout de lectura para evitar bloqueos
                 if (System.currentTimeMillis() - startTime > 5000) { // 5 segundos máximo
-                    throw new IOException("Timeout leyendo string - esperados: " + length + ", leídos: " + totalRead);
+                    throw new IOException("Timeout leyendo string - esperados: " + length + ", leidos: " + totalRead);
                 }
             }
             
@@ -82,7 +82,7 @@ public class AdapterJ {
             return result;
             
         } catch (Exception e) {
-            System.out.println("❌ Error crítico en receiveString: " + e.getMessage());
+            System.out.println("Error crítico en receiveString: " + e.getMessage());
             throw e;
         }
     }

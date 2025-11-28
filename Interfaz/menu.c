@@ -7,104 +7,111 @@
 #include <time.h>
 #include <math.h>
 
-// Variables estáticas para actualización de lista
+// Variables para control de actualizacion de lista de partidas
 static double ultimo_refresh_lista = 0;
-static const double INTERVALO_REFRESH = 3.0; // Actualizar cada 3 segundos
+static const double INTERVALO_REFRESH = 3.0; // Actualiza cada 3 segundos
 
-// ==================== ACTUALIZACIÓN DE MENÚ PRINCIPAL ====================
+// ==================== ACTUALIZACION DE MENU PRINCIPAL ====================
 
 void actualizar_menu_principal(FrameInputs* inputs, EstadoMenu* estado_menu, int* seleccion_actual) {
+    // Verificar si se presiono ENTER
     if (inputs->enter_pressed) {
         if (*seleccion_actual == 0) {
-            // JUGADOR - Crea nueva partida con identificador único
+            // Opcion JUGADOR - Crear nueva partida
             char game_id[50];
+            // Generar ID unico usando timestamp
             snprintf(game_id, sizeof(game_id), "partida_%lld", (long long)time(NULL));
             
+            // Intentar crear partida en servidor
             if (servidor_conectado && crear_nueva_partida(game_id)) {
                 strcpy(partida_seleccionada_global, game_id);
                 *estado_menu = MENU_CREATING_GAME;
                 printf("Creando partida: %s - Esperando confirmacion...\n", game_id);
             } else {
-                printf("⚠️ No se pudo crear partida - servidor no conectado\n");
+                printf("No se pudo crear partida - servidor no conectado\n");
             }
         } else if (*seleccion_actual == 1) {
-            // ESPECTADOR - Solicita lista
+            // Opcion ESPECTADOR - Ir a seleccion de partida
             *estado_menu = MENU_SELECT_GAME;
             if (servidor_conectado) {
                 solicitar_lista_partidas();
                 ultimo_refresh_lista = GetTime();
             }
-            *seleccion_actual = 0; // Reset selección para el siguiente menú
+            *seleccion_actual = 0; // Resetear seleccion para el siguiente menu
         }
     }
     
-    // Navegación del menu
+    // Navegacion del menu con flechas
     if (inputs->seleccion_menu != 0) {
         *seleccion_actual += inputs->seleccion_menu;
+        // Mantener seleccion dentro de limites
         if (*seleccion_actual < 0) *seleccion_actual = 1;
         if (*seleccion_actual > 1) *seleccion_actual = 0;
     }
 }
 
-// ==================== ACTUALIZACIÓN DE SELECCIÓN DE PARTIDA ====================
+// ==================== ACTUALIZACION DE SELECCION DE PARTIDA ====================
 
 void actualizar_seleccion_partida(FrameInputs* inputs, EstadoMenu* estado_menu, int* seleccion_actual) {
+    // Volver al menu principal con ESC
     if (inputs->escape_pressed) {
         *estado_menu = MENU_MAIN;
         *seleccion_actual = 0;
-        cantidad_partidas = 0; // Limpiar lista
+        cantidad_partidas = 0; // Limpiar lista de partidas
         return;
     }
     
-    // Actualizar lista automáticamente cada X segundos
+    // Actualizar lista automaticamente cada intervalo definido
     double tiempo_actual = GetTime();
     if (tiempo_actual - ultimo_refresh_lista >= INTERVALO_REFRESH) {
         if (servidor_conectado) {
             solicitar_lista_partidas();
             ultimo_refresh_lista = tiempo_actual;
-            printf("🔄 Actualizando lista de partidas...\n");
+            printf("Actualizando lista de partidas...\n");
         }
     }
     
     // Procesar respuesta del servidor (lista de partidas)
     procesar_respuesta_servidor(NULL);
     
-    // Navegación
+    // Navegacion en lista de partidas
     if (inputs->seleccion_menu != 0 && cantidad_partidas > 0) {
         *seleccion_actual += inputs->seleccion_menu;
+        // Circular por la lista
         if (*seleccion_actual < 0) *seleccion_actual = cantidad_partidas - 1;
         if (*seleccion_actual >= cantidad_partidas) *seleccion_actual = 0;
     }
     
-    // Selección (solo partidas activas)
+    // Seleccionar partida con ENTER
     if (inputs->enter_pressed && cantidad_partidas > 0) {
         InfoPartida* partida_seleccionada = &partidas_disponibles[*seleccion_actual];
         
+        // Solo unirse a partidas activas
         if (partida_seleccionada->active) {
             if (unirse_partida_espectador(partida_seleccionada->game_id)) {
                 strcpy(partida_seleccionada_global, partida_seleccionada->game_id);
                 *estado_menu = MENU_JOINING_GAME;
-                printf("🎮 Uniéndose como espectador a: %s\n", partida_seleccionada->game_id);
+                printf("Uniendose como espectador a: %s\n", partida_seleccionada->game_id);
             }
         } else {
-            printf("⚠️ No se puede observar una partida inactiva\n");
+            printf("No se puede observar una partida inactiva\n");
         }
     }
     
-    // Refresh manual con R
+    // Refresh manual con tecla R
     if (IsKeyPressed(KEY_R) && servidor_conectado) {
         solicitar_lista_partidas();
         ultimo_refresh_lista = tiempo_actual;
-        printf("🔄 Lista actualizada manualmente\n");
+        printf("Lista actualizada manualmente\n");
     }
 }
 
-// ==================== ACTUALIZACIÓN MODO JUGADOR ====================
+// ==================== ACTUALIZACION MODO JUGADOR ====================
 
 void actualizar_modo_jugador(FrameInputs* inputs, EstadoMenu* estado_menu, EstadoJuego* estado_juego) {
-    // Verificar que la conexión sigue activa
+    // Verificar que la conexion sigue activa
     if (!servidor_conectado) {
-        printf("📌 Servidor desconectado, volviendo al menú\n");
+        printf("Servidor desconectado, volviendo al menu\n");
         *estado_menu = MENU_MAIN;
         return;
     }
@@ -114,22 +121,23 @@ void actualizar_modo_jugador(FrameInputs* inputs, EstadoMenu* estado_menu, Estad
     // Procesar respuesta del servidor PRIMERO
     if (!procesar_respuesta_servidor(estado_juego)) {
         error_count++;
+        // Verificar si hay demasiados errores consecutivos
         if (error_count > 10) {
-            printf("📌 Demasiados errores, verificando conexión...\n");
+            printf("Demasiados errores, verificando conexion...\n");
             if (!hay_datos_disponibles()) {
-                printf("📌 Conexión perdida, volviendo al menú\n");
+                printf("Conexion perdida, volviendo al menu\n");
                 *estado_menu = MENU_MAIN;
                 error_count = 0;
                 return;
             }
         }
     } else {
-        error_count = 0;
+        error_count = 0; // Resetear contador si procesamiento fue exitoso
     }
     
-    // ✅ VERIFICAR GAME OVER (vidas = 0)
+    // VERIFICAR GAME OVER (vidas = 0)
     if (estado_juego->jugador.vidas <= 0) {
-        printf("💀 GAME OVER - Sin vidas\n");
+        printf("GAME OVER - Sin vidas\n");
         salir_partida_jugador(partida_seleccionada_global);
         set_partida_activa(false);
         *estado_menu = MENU_MAIN;
@@ -137,7 +145,7 @@ void actualizar_modo_jugador(FrameInputs* inputs, EstadoMenu* estado_menu, Estad
         return;
     }
     
-    // ✅ VERIFICAR VICTORIA (llegó donde el padre)
+    // VERIFICAR VICTORIA (llegar donde el padre)
     float distancia_al_padre = sqrt(
         pow(estado_juego->jugador.x - estado_juego->padre.x, 2) +
         pow(estado_juego->jugador.y - estado_juego->padre.y, 2)
@@ -146,7 +154,7 @@ void actualizar_modo_jugador(FrameInputs* inputs, EstadoMenu* estado_menu, Estad
     const float DISTANCIA_VICTORIA = 30.0f; // Radio de victoria
     
     if (distancia_al_padre <= DISTANCIA_VICTORIA && estado_juego->padre.activo) {
-        printf("🎉 ¡VICTORIA! - Llegaste donde tu padre\n");
+        printf("VICTORIA - Llegaste donde tu padre\n");
         salir_partida_jugador(partida_seleccionada_global);
         set_partida_activa(false);
         *estado_menu = MENU_MAIN;
@@ -159,6 +167,7 @@ void actualizar_modo_jugador(FrameInputs* inputs, EstadoMenu* estado_menu, Estad
         for (int i = 0; i < inputs->num_inputs; i++) {
             const char* input_str = inputs->inputs[i];
             
+            // Procesar tecla liberada
             if (strstr(input_str, "_RELEASED") != NULL) {
                 char key[20];
                 strncpy(key, input_str, strlen(input_str) - 9);
@@ -166,12 +175,13 @@ void actualizar_modo_jugador(FrameInputs* inputs, EstadoMenu* estado_menu, Estad
                 
                 if (!enviar_input_al_servidor(CLIENT_PLAYER, partida_seleccionada_global,
                                              "KEY_RELEASED", key)) {
-                    printf("❌ Error enviando input\n");
+                    printf("Error enviando input\n");
                     *estado_menu = MENU_MAIN;
                     error_count = 0;
                     return;
                 }
             } 
+            // Procesar tecla presionada
             else if (strstr(input_str, "_PRESSED") != NULL) {
                 char key[20];
                 strncpy(key, input_str, strlen(input_str) - 8);
@@ -179,7 +189,7 @@ void actualizar_modo_jugador(FrameInputs* inputs, EstadoMenu* estado_menu, Estad
                 
                 if (!enviar_input_al_servidor(CLIENT_PLAYER, partida_seleccionada_global,
                                              "KEY_PRESSED", key)) {
-                    printf("❌ Error enviando input\n");
+                    printf("Error enviando input\n");
                     *estado_menu = MENU_MAIN;
                     error_count = 0;
                     return;
@@ -188,9 +198,9 @@ void actualizar_modo_jugador(FrameInputs* inputs, EstadoMenu* estado_menu, Estad
         }
     }
     
-    // Volver al menú con ESC
+    // Volver al menu con ESC
     if (inputs->escape_pressed) {
-        printf("🎮 Saliendo de partida por ESC...\n");
+        printf("Saliendo de partida por ESC...\n");
         salir_partida_jugador(partida_seleccionada_global);
         set_partida_activa(false);
         *estado_menu = MENU_MAIN;
@@ -198,9 +208,10 @@ void actualizar_modo_jugador(FrameInputs* inputs, EstadoMenu* estado_menu, Estad
     }
 }
 
-// ==================== ACTUALIZACIÓN MODO ESPECTADOR ====================
+// ==================== ACTUALIZACION MODO ESPECTADOR ====================
 
 void actualizar_modo_espectador(FrameInputs* inputs, EstadoMenu* estado_menu, EstadoJuego* estado_juego) {
+    // Procesar actualizaciones del servidor si esta conectado
     if (servidor_conectado) {
         procesar_respuesta_servidor(estado_juego);
     }
@@ -210,11 +221,11 @@ void actualizar_modo_espectador(FrameInputs* inputs, EstadoMenu* estado_menu, Es
         salir_partida_espectador(partida_seleccionada_global);
         set_partida_activa(false);
         *estado_menu = MENU_MAIN;
-        printf("=== VOLVIENDO AL MENU DESDE ESPECTADOR ===\n");
+        printf("VOLVIENDO AL MENU DESDE ESPECTADOR\n");
     }
 }
 
-// ==================== ACTUALIZACIÓN ESTADO ESPERA ====================
+// ==================== ACTUALIZACION ESTADO ESPERA ====================
 
 void actualizar_estado_espera(FrameInputs* inputs, EstadoMenu* estado_menu, EstadoJuego* estado_juego) {
     static bool start_game_enviado = false;
@@ -224,51 +235,54 @@ void actualizar_estado_espera(FrameInputs* inputs, EstadoMenu* estado_menu, Esta
     
     long ahora = GetTime() * 1000;
     
+    // Inicializar tiempo de inicio
     if (tiempo_inicio == 0) tiempo_inicio = ahora;
     
     // Procesar respuesta del servidor
     if (procesar_respuesta_servidor(estado_juego)) {
-        printf("✅ Respuesta del servidor procesada en estado espera\n");
+        printf("Respuesta del servidor procesada en estado espera\n");
         
+        // Si se esta creando partida y aun no se envio START_GAME
         if (*estado_menu == MENU_CREATING_GAME && !start_game_enviado) {
-            printf("📤 GAME_CREATED recibido, enviando START_GAME...\n");
+            printf("GAME_CREATED recibido, enviando START_GAME...\n");
             if (confirmar_inicio_partida(partida_seleccionada_global)) {
                 start_game_enviado = true;
                 intentos = 0;
-                printf("⏳ START_GAME enviado, esperando GAME_STARTED...\n");
+                printf("START_GAME enviado, esperando GAME_STARTED...\n");
             }
         }
+        // Si se esta uniendo como espectador
         else if (*estado_menu == MENU_JOINING_GAME) {
             *estado_menu = MENU_SPECTATING;
             tiempo_inicio = 0;
-            printf("✅ ¡Unido como ESPECTADOR!\n");
+            printf("Unido como ESPECTADOR\n");
         }
     }
     
-    // Reintentar START_GAME
+    // Reintentar envio de START_GAME si es necesario
     if (*estado_menu == MENU_CREATING_GAME && start_game_enviado && 
         !esta_en_partida_activa() && intentos < 3) {
         
         if (ahora - ultimo_intento > 1000) {
-            printf("🔄 Reintentando START_GAME (intento %d)...\n", intentos + 1);
+            printf("Reintentando START_GAME (intento %d)...\n", intentos + 1);
             confirmar_inicio_partida(partida_seleccionada_global);
             intentos++;
             ultimo_intento = ahora;
         }
     }
     
-    // Transición a juego
+    // Transicion a juego cuando la partida esta activa
     if (start_game_enviado && esta_en_partida_activa()) {
         *estado_menu = MENU_PLAYING;
         start_game_enviado = false;
         intentos = 0;
         tiempo_inicio = 0;
-        printf("✅ ¡Partida INICIADA como JUGADOR!\n");
+        printf("Partida INICIADA como JUGADOR\n");
     }
     
-    // Timeout 8 segundos
+    // Timeout de 8 segundos
     if (ahora - tiempo_inicio > 8000) {
-        printf("⏱️ Timeout esperando inicio de partida\n");
+        printf("Timeout esperando inicio de partida\n");
         *estado_menu = MENU_MAIN;
         set_partida_activa(false);
         start_game_enviado = false;
@@ -283,11 +297,11 @@ void actualizar_estado_espera(FrameInputs* inputs, EstadoMenu* estado_menu, Esta
         start_game_enviado = false;
         intentos = 0;
         tiempo_inicio = 0;
-        printf("❌ Cancelando conexión...\n");
+        printf("Cancelando conexion...\n");
     }
 }
 
-// ==================== RENDERIZADO DE MENÚS ====================
+// ==================== RENDERIZADO DE MENUS ====================
 
 void dibujar_menu_principal(int seleccion) {
     int centerX = GetScreenWidth() / 2;
@@ -296,27 +310,28 @@ void dibujar_menu_principal(int seleccion) {
     // Fondo semitransparente
     DrawRectangle(0, 0, GetScreenWidth(), GetScreenHeight(), (Color){0, 0, 0, 200});
     
-    // Título
+    // Titulo
     DrawText("DONKEY KONG JR", centerX - 180, centerY - 150, 40, YELLOW);
     
-    // Estado de conexión
+    // Estado de conexion
     const char* estado_servidor = servidor_conectado ? "CONECTADO" : "DESCONECTADO";
     Color color_servidor = servidor_conectado ? GREEN : RED;
     DrawText(TextFormat("Servidor: %s", estado_servidor), centerX - 100, centerY - 90, 20, color_servidor);
     
-    // Opciones
+    // Opciones del menu
     const char* opciones[] = {"JUGAR COMO JUGADOR", "OBSERVAR PARTIDA"};
     for (int i = 0; i < 2; i++) {
         Color color = (i == seleccion) ? GREEN : WHITE;
         DrawText(opciones[i], centerX - 140, centerY - 30 + i * 60, 30, color);
         
+        // Indicador de seleccion
         if (i == seleccion) {
             DrawText(">", centerX - 170, centerY - 30 + i * 60, 30, GREEN);
         }
     }
     
     // Instrucciones
-    DrawText("↑↓ Navegar | ENTER Seleccionar", centerX - 180, centerY + 120, 20, LIGHTGRAY);
+    DrawText("NAVEGAR | ENTER Seleccionar", centerX - 180, centerY + 120, 20, LIGHTGRAY);
 }
 
 void dibujar_seleccion_partida(int seleccion, InfoPartida partidas[], int count) {
@@ -326,14 +341,15 @@ void dibujar_seleccion_partida(int seleccion, InfoPartida partidas[], int count)
     // Fondo
     DrawRectangle(0, 0, GetScreenWidth(), GetScreenHeight(), (Color){0, 0, 0, 200});
     
-    // Título
+    // Titulo
     DrawText("SELECCIONAR PARTIDA", centerX - 180, 50, 35, YELLOW);
     
-    // Tiempo hasta próxima actualización
+    // Tiempo hasta proxima actualizacion
     double tiempo_restante = INTERVALO_REFRESH - (GetTime() - ultimo_refresh_lista);
-    DrawText(TextFormat("Actualización en: %.1fs", tiempo_restante), 
+    DrawText(TextFormat("Actualizacion en: %.1fs", tiempo_restante), 
              GetScreenWidth() - 250, 20, 18, LIGHTGRAY);
     
+    // Mensaje si no hay partidas
     if (count == 0) {
         DrawText("No hay partidas disponibles", centerX - 150, centerY, 25, RED);
         DrawText("Esperando partidas...", centerX - 100, centerY + 40, 20, ORANGE);
@@ -350,17 +366,17 @@ void dibujar_seleccion_partida(int seleccion, InfoPartida partidas[], int count)
     DrawLine(30, startY + 30, GetScreenWidth() - 30, startY + 30, GRAY);
     
     // Lista de partidas
-    for (int i = 0; i < count && i < 8; i++) { // Máximo 8 partidas visibles
+    for (int i = 0; i < count && i < 8; i++) { // Maximo 8 partidas visibles
         int y = startY + 50 + i * 45;
         Color color = (i == seleccion) ? GREEN : WHITE;
         Color color_fondo = (i == seleccion) ? (Color){0, 100, 0, 50} : (Color){0, 0, 0, 0};
         
-        // Fondo de selección
+        // Fondo de seleccion
         if (i == seleccion) {
             DrawRectangle(30, y - 5, GetScreenWidth() - 60, 40, color_fondo);
         }
         
-        // Indicador de selección
+        // Indicador de seleccion
         if (i == seleccion) {
             DrawText(">", 20, y, 25, GREEN);
         }
@@ -377,6 +393,7 @@ void dibujar_seleccion_partida(int seleccion, InfoPartida partidas[], int count)
             strcpy(id_corto, partidas[i].game_id);
         }
         
+        // Dibujar informacion de partida
         DrawText(id_corto, 50, y, 20, color);
         DrawText(TextFormat("%d", partidas[i].player_count), 330, y, 20, color);
         DrawText(TextFormat("%d", partidas[i].spectators), 510, y, 20, color);
@@ -387,19 +404,21 @@ void dibujar_seleccion_partida(int seleccion, InfoPartida partidas[], int count)
         DrawText(estado_str, 650, y, 20, estado_color);
     }
     
+    // Indicar si hay mas partidas no mostradas
     if (count > 8) {
-        DrawText(TextFormat("... y %d más", count - 8), centerX - 50, startY + 410, 18, GRAY);
+        DrawText(TextFormat("... y %d mas", count - 8), centerX - 50, startY + 410, 18, GRAY);
     }
     
     // Instrucciones
     DrawRectangle(0, GetScreenHeight() - 80, GetScreenWidth(), 80, (Color){0, 0, 0, 180});
-    DrawText("↑↓ Navegar | ENTER Observar | R Actualizar | ESC Volver", 
+    DrawText("NAVEGAR | ENTER Observar | R Actualizar | ESC Volver", 
              centerX - 280, GetScreenHeight() - 50, 20, LIGHTGRAY);
 }
 
 void dibujar_hud_espectador(const char* partida_actual) {
+    // Panel informativo
     DrawRectangle(10, 10, 320, 70, (Color){0, 0, 0, 160});
-    DrawText("👁️  MODO ESPECTADOR", 20, 15, 22, YELLOW);
+    DrawText("MODO ESPECTADOR", 20, 15, 22, YELLOW);
     
     // Acortar ID si es muy largo
     char id_display[35];
@@ -418,9 +437,10 @@ void dibujar_hud_espectador(const char* partida_actual) {
 }
 
 void dibujar_hud_jugador(const char* partida_actual) {
+    // Panel informativo
     DrawRectangle(10, 10, 280, 50, (Color){0, 0, 0, 160});
-    DrawText("🎮 MODO JUGADOR", 20, 15, 22, GREEN);
-    DrawText("ESC Menú", GetScreenWidth() - 120, 20, 20, LIGHTGRAY);
+    DrawText("MODO JUGADOR", 20, 15, 22, GREEN);
+    DrawText("ESC Menu", GetScreenWidth() - 120, 20, 20, LIGHTGRAY);
 }
 
 void dibujar_pantalla_game_over(void) {
@@ -430,13 +450,13 @@ void dibujar_pantalla_game_over(void) {
     // Overlay oscuro
     DrawRectangle(0, 0, GetScreenWidth(), GetScreenHeight(), (Color){0, 0, 0, 200});
     
-    // Título GAME OVER con efecto
+    // Titulo GAME OVER con efecto de sombra
     DrawText("GAME OVER", centerX - 180, centerY - 80, 60, RED);
     DrawText("GAME OVER", centerX - 182, centerY - 82, 60, DARKGRAY);
     
     // Mensaje
     DrawText("Te quedaste sin vidas", centerX - 130, centerY + 20, 25, WHITE);
-    DrawText("Volviendo al menú...", centerX - 120, centerY + 60, 22, LIGHTGRAY);
+    DrawText("Volviendo al menu...", centerX - 120, centerY + 60, 22, LIGHTGRAY);
 }
 
 void dibujar_pantalla_victoria(void) {
@@ -446,13 +466,13 @@ void dibujar_pantalla_victoria(void) {
     // Overlay dorado
     DrawRectangle(0, 0, GetScreenWidth(), GetScreenHeight(), (Color){255, 215, 0, 100});
     
-    // Título VICTORIA con efecto
-    DrawText("¡VICTORIA!", centerX - 160, centerY - 80, 60, GOLD);
-    DrawText("¡VICTORIA!", centerX - 162, centerY - 82, 60, ORANGE);
+    // Titulo VICTORIA con efecto de sombra
+    DrawText("VICTORIA", centerX - 160, centerY - 80, 60, GOLD);
+    DrawText("VICTORIA", centerX - 162, centerY - 82, 60, ORANGE);
     
     // Mensaje
-    DrawText("¡Rescataste a tu padre!", centerX - 150, centerY + 20, 28, WHITE);
-    DrawText("Volviendo al menú...", centerX - 120, centerY + 60, 22, LIGHTGRAY);
+    DrawText("Rescataste a tu padre", centerX - 150, centerY + 20, 28, WHITE);
+    DrawText("Volviendo al menu...", centerX - 120, centerY + 60, 22, LIGHTGRAY);
 }
 
 void dibujar_estado_espera(EstadoMenu estado) {
@@ -462,16 +482,17 @@ void dibujar_estado_espera(EstadoMenu estado) {
     // Fondo
     DrawRectangle(0, 0, GetScreenWidth(), GetScreenHeight(), (Color){0, 0, 0, 200});
     
+    // Mensaje segun estado
     const char* mensaje;
     if (estado == MENU_CREATING_GAME) {
         mensaje = "Creando partida...";
     } else {
-        mensaje = "Uniéndose a partida...";
+        mensaje = "Uniendose a partida...";
     }
     
     DrawText(mensaje, centerX - 140, centerY - 20, 30, YELLOW);
     
-    // Animación de puntos
+    // Animacion de puntos para indicar actividad
     static int dots = 0;
     static double last_time = 0;
     double current_time = GetTime();
@@ -487,5 +508,6 @@ void dibujar_estado_espera(EstadoMenu estado) {
     }
     DrawText(dots_str, centerX + 140, centerY - 20, 30, YELLOW);
     
+    // Instruccion
     DrawText("ESC para cancelar", centerX - 100, centerY + 40, 20, LIGHTGRAY);
 }

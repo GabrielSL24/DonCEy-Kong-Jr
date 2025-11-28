@@ -22,10 +22,10 @@ typedef struct {
     Sprite fruta_orange;
 } SistemaSprites;
 
-// Declarar la variable global
+// Variable global de sprites
 extern SistemaSprites sprites_global;
 
-// ==================== FUNCIONES DE INICIALIZACIÓN ====================
+// ==================== FUNCIONES DE INICIALIZACION ====================
 void inicializar_graficos(void);
 void cerrar_graficos(void);
 void cargar_sprites(SistemaSprites *sprites);
