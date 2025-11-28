@@ -48,20 +48,33 @@ public class AdapterJ {
             int length = input.readInt();
             System.out.println("Adapter: Tamaño recibido: " + length);
             
-            if (length <= 0 || length > 100000) { // Aumentar límite máximo
-                throw new IOException("Tamaño de string inválido: " + length);
+            // Validaciones más estrictas
+            if (length <= 0) {
+                throw new IOException("Tamaño de string inválido (<= 0): " + length);
+            }
+            if (length > 1024 * 1024) { // Máximo 1MB
+                throw new IOException("Tamaño de string demasiado grande: " + length);
+            }
+            if (length == 2064261152) { // Valor específico que causa problemas
+                throw new IOException("Tamaño corrupto detectado: " + length);
             }
             
             byte[] bytes = new byte[length];
             int totalRead = 0;
             
-            // Leer todos los bytes necesarios
+            // Leer todos los bytes necesarios con timeout
+            long startTime = System.currentTimeMillis();
             while (totalRead < length) {
                 int bytesRead = input.read(bytes, totalRead, length - totalRead);
                 if (bytesRead == -1) {
                     throw new IOException("Conexión cerrada mientras se leía string");
                 }
                 totalRead += bytesRead;
+                
+                // Timeout de lectura para evitar bloqueos
+                if (System.currentTimeMillis() - startTime > 5000) { // 5 segundos máximo
+                    throw new IOException("Timeout leyendo string - esperados: " + length + ", leídos: " + totalRead);
+                }
             }
             
             String result = new String(bytes, StandardCharsets.UTF_8);
@@ -73,7 +86,6 @@ public class AdapterJ {
             throw e;
         }
     }
-
 
     public void sendIdentification(String clientType) throws IOException {
         int code = getClientType(clientType);

@@ -170,7 +170,7 @@ bool serializar_input_a_json(TipoCliente client_type, const char* game_id,
 
 bool enviar_input_al_servidor(TipoCliente client_type, const char* game_id,
                              const char* input_type, const char* key) {
-    if (!servidor_conectado || !partida_activa) {  //solo si la partida esta activa
+    if (!servidor_conectado || !partida_activa) {
         printf("Servidor no conectado o partida no activa, input ignorado: %s\n", key);
         return false;
     }
@@ -181,11 +181,20 @@ bool enviar_input_al_servidor(TipoCliente client_type, const char* game_id,
         return false;
     }
     
+    // Verificar que el tamaño sea razonable antes de enviar
+    if (paquete.json_size <= 0 || paquete.json_size > 10000) {
+        printf("❌ Tamaño de JSON inválido: %d\n", (int)paquete.json_size);
+        liberar_paquete_json(&paquete);
+        return false;
+    }
+    
     // Envia tamaño primero
-    adapter_send_int(socket_servidor, (int)paquete.json_size);
+    int size_to_send = (int)paquete.json_size;
+    printf("Enviando tamaño: %d\n", size_to_send);
+    adapter_send_int(socket_servidor, size_to_send);
     
     // Envia datos JSON
-    int bytes_sent = send(socket_servidor, paquete.json_data, (int)paquete.json_size, 0);
+    int bytes_sent = send(socket_servidor, paquete.json_data, size_to_send, 0);
     
     liberar_paquete_json(&paquete);
     
@@ -194,7 +203,7 @@ bool enviar_input_al_servidor(TipoCliente client_type, const char* game_id,
         return false;
     }
     
-    printf("Input enviado al servidor: %s - %s\n", input_type, key);
+    printf("Input enviado al servidor: %s - %s (%d bytes)\n", input_type, key, bytes_sent);
     return true;
 }
 // ==================== FUNCIONES DE HANDSHAKE ====================
@@ -405,10 +414,18 @@ bool procesar_respuesta_servidor(EstadoJuego *estado) {
         }
         else if (strcmp(response_type, "GAME_LEFT") == 0) {
             printf("🎮 Partida terminada - desconectando...\n");
+            
+            // Extraer game_id de la respuesta para verificar
+            char* game_id_respuesta = extraer_string_json(json_buffer, "game_id");
+            if (game_id_respuesta) {
+                printf("Partida cerrada: %s\n", game_id_respuesta);
+                free(game_id_respuesta);
+            }
+            
             set_partida_activa(false);
             free(response_type);
             free(json_buffer);
-            return false; // Indicar que la partida terminó
+            return true; // Cambiar a true para indicar que se procesó correctamente
         }
         else {
             printf("Respuesta no manejada: %s\n", response_type);

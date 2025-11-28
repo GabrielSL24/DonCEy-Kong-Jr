@@ -64,12 +64,32 @@ void actualizar_seleccion_partida(FrameInputs* inputs, EstadoMenu* estado_menu, 
 // ==================== ACTUALIZACION MODO JUGADOR ====================
 
 void actualizar_modo_jugador(FrameInputs* inputs, EstadoMenu* estado_menu, EstadoJuego* estado_juego) {
-
     // Verificar que la conexión sigue activa
     if (!servidor_conectado) {
         printf("Servidor desconectado, volviendo al menú\n");
         *estado_menu = MENU_MAIN;
         return;
+    }
+    
+    // Declarar la variable estática aquí
+    static int error_count = 0;
+    
+    // Procesar respuesta del servidor PRIMERO
+    if (!procesar_respuesta_servidor(estado_juego)) {
+        printf("⚠️  No se pudo procesar respuesta del servidor\n");
+        // Si falla repetidamente, verificar conexión
+        error_count++;
+        if (error_count > 5) {
+            printf("🔌 Demasiados errores, verificando conexión...\n");
+            if (!hay_datos_disponibles()) {
+                printf("🔌 Conexión perdida, volviendo al menú\n");
+                *estado_menu = MENU_MAIN;
+                error_count = 0; // Resetear antes de salir
+                return;
+            }
+        }
+    } else {
+        error_count = 0; // Resetear contador si hay éxito
     }
     
     // Enviar inputs al servidor SOLO si estamos conectados
@@ -78,16 +98,15 @@ void actualizar_modo_jugador(FrameInputs* inputs, EstadoMenu* estado_menu, Estad
             const char* input_str = inputs->inputs[i];
             
             if (strstr(input_str, "_RELEASED") != NULL) {
-
                 char key[20];
                 strncpy(key, input_str, strlen(input_str) - 9);
                 key[strlen(input_str) - 9] = '\0';
                 
-
                 if (!enviar_input_al_servidor(CLIENT_PLAYER, partida_seleccionada_global,
                                              "KEY_RELEASED", key)) {
                     printf("Error enviando input, servidor puede estar desconectado\n");
                     *estado_menu = MENU_MAIN;
+                    error_count = 0; // Resetear antes de salir
                     return;
                 }
             } 
@@ -99,34 +118,20 @@ void actualizar_modo_jugador(FrameInputs* inputs, EstadoMenu* estado_menu, Estad
                                              "KEY_PRESSED", key)) {
                     printf("❌ Error enviando input, servidor puede estar desconectado\n");
                     *estado_menu = MENU_MAIN;
+                    error_count = 0; // Resetear antes de salir
                     return;
                 }
             }
         }
     }
     
-    // Procesar respuesta del servidor
-    if (!procesar_respuesta_servidor(estado_juego)) {
-        printf("⚠️  No se pudo procesar respuesta del servidor\n");
-    }
-
-    
-
-    /*
-    // DEBUG: Mostrar posición del jugador cada 60 frames (≈1 segundo)
-    if (frame_count++ % 60 == 0) {
-        printf("DEBUG Jugador - X: %.1f, Y: %.1f, Estado: %d, Vidas: %d\n", 
-               estado_juego->jugador.x, estado_juego->jugador.y, 
-               estado_juego->jugador.estado, estado_juego->jugador.vidas);
-    }
-    */
     // Volver al menú si se presiona ESC
     if (inputs->escape_pressed) {
         printf("🎮 Saliendo de partida por ESC...\n");
         salir_partida_jugador(partida_seleccionada_global);
         set_partida_activa(false);
         *estado_menu = MENU_MAIN;
-
+        error_count = 0; // Resetear antes de salir
 
         printf("=== VOLVIENDO AL MENU DESDE JUEGO ===\n");
     }
