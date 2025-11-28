@@ -554,6 +554,15 @@ bool deserializar_json_a_estado(const char *json_data, EstadoJuego *estado) {
            estado->juego_activo ? "SI" : "NO");
     
     return true;
+
+        // ✅ AGREGAR AL FINAL - Debug de lo que se recibió
+    static int debug_count = 0;
+    if (debug_count++ % 10 == 0) { // Cada 10 updates
+        printf("🔄 GAME_STATE Recibido - Jugador: (%.1f, %.1f), Estado: %d\n",
+               estado->jugador.x, estado->jugador.y, estado->jugador.estado);
+    }
+    
+    return true;
 }
 
 // ==================== FUNCIONES UTILITARIAS ====================
