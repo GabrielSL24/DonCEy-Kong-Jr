@@ -1,126 +1,109 @@
 #include "graficos.h"
 #include "controles.h"
-#include "game.h"
 #include "conexion.h"
+#include "menu.h"
+#include "config.h"
 #include <stdio.h>
+#include <string.h>
+
+void inicializar_estado_default(EstadoJuego *estado) {
+    printf("Inicializando estado por defecto\n");
+    memset(estado, 0, sizeof(EstadoJuego));
+    estado->jugador.x = 100.0f;
+    estado->jugador.y = 500.0f;
+    estado->jugador.vidas = 3;
+    estado->jugador.activo = true;
+    estado->juego_activo = true;
+}
 
 int main(void) {
-    EstadoJuego estado;
+    EstadoJuego estado_juego;
     FrameInputs inputs_frame;
     
     // Inicialización
     inicializar_graficos();
-    inicializar_estado_juego(&estado);
+    inicializar_estado_default(&estado_juego);
     
-    printf("🎮 Cliente Donkey Kong Jr Iniciado\n");
+    printf("Cliente Donkey Kong Jr Iniciado\n");
     printf("   - Pantalla: %dx%d\n", SCREEN_WIDTH, SCREEN_HEIGHT);
     printf("   - FPS: %d\n", FPS);
     
     // Conexión al servidor
     if(!conectar_servidor("127.0.0.1")) {
-        printf("🔌 Modo local activado (sin servidor)\n");
+        printf("Modo local activado (sin servidor)\n");
     } else {
-        printf("✅ Conectado al servidor\n");
+        printf("Conectado al servidor\n");
     }
 
-    // Variables para control de tiempo (fuera del loop)
-    static float ultimo_envio = 0.0f;
-    static bool primer_input_enviado = false;
-    static float tiempo_inicio = 0.0f;
+    // Variables para estado de la aplicación
+    EstadoMenu estado_menu = MENU_MAIN;
+    int seleccion_actual = 0;
     
     // Bucle principal del juego
     while (!WindowShouldClose()) {
-
-        float tiempo_actual = GetTime();
-
-        // 1. DETECTAR INPUTS
+        // 1. DETECTAR INPUTS (siempre)
         detectar_inputs_frame(&inputs_frame);
         
-        // 2. ENVIAR INPUTS AL SERVIDOR
-        if (servidor_conectado) {
-            
-            // Inicializar tiempo_inicio en el primer frame
-            if (tiempo_inicio == 0.0f) {
-                tiempo_inicio = GetTime();
-            }
-
-            // Enviar inputs cada 100ms (10 FPS) para no saturar
-            if (inputs_frame.num_inputs > 0 && (tiempo_actual - ultimo_envio > 0.1f)) {
-                for (int i = 0; i < inputs_frame.num_inputs; i++) {
-                    printf("🎮 Enviando input: %s\n", inputs_frame.inputs[i]);
-                    enviar_input_al_servidor(
-                        CLIENT_PLAYER, 
-                        1, 
-                        "partida_default",
-                        "KEY_PRESSED",
-                        inputs_frame.inputs[i]
-                    );
-                }
-                primer_input_enviado = true;
-                ultimo_envio = tiempo_actual;
-            }
-
-            // Input automático después de 2 segundos si no se ha enviado nada 
-            if (!primer_input_enviado && (tiempo_actual - tiempo_inicio > 2.0f)) {
-                printf("🎮 Enviando input inicial de prueba...\n");
-                enviar_input_al_servidor(
-                    CLIENT_PLAYER, 
-                    1, 
-                    "partida_default",
-                    "KEY_PRESSED", 
-                    "RIGHT"
-                );
-                primer_input_enviado = true;
-                ultimo_envio = tiempo_actual;
-            }
-        } else {
-            // MODO LOCAL: Mostrar inputs detectados (debug)
-            if (inputs_frame.num_inputs > 0) {
-                printf("🔧 Modo local - Inputs ignorados: ");
-                for (int i = 0; i < inputs_frame.num_inputs; i++) {
-                    printf("%s ", inputs_frame.inputs[i]);
-                }
-                printf("\n");
-            }
+        // 2. MAQUINA DE ESTADOS - ACTUALIZACIÓN
+        switch (estado_menu) {
+            case MENU_MAIN:
+                actualizar_menu_principal(&inputs_frame, &estado_menu, &seleccion_actual);
+                break;
+                
+            case MENU_SELECT_GAME:
+                actualizar_seleccion_partida(&inputs_frame, &estado_menu, &seleccion_actual);
+                break;
+                
+            case MENU_CREATING_GAME:    // ← NUEVO ESTADO
+            case MENU_JOINING_GAME:     // ← NUEVO ESTADO
+                actualizar_estado_espera(&inputs_frame, &estado_menu, &estado_juego);
+                break;
+                
+            case MENU_PLAYING:
+                actualizar_modo_jugador(&inputs_frame, &estado_menu, &estado_juego);
+                break;
+                
+            case MENU_SPECTATING:
+                actualizar_modo_espectador(&inputs_frame, &estado_menu, &estado_juego);
+                break;
         }
         
-        // 3. RECIBIR ESTADO ACTUALIZADO DEL SERVIDOR
-        if (servidor_conectado) {
-            if (recibir_estado_actualizado(&estado)) {
-                printf("📥 Estado recibido del servidor - Pos: (%.1f, %.1f)\n", 
-                       estado.jugador.x, estado.jugador.y);
-            }
-        } else {
-            // MODO LOCAL: Simular estado estático (solo para prueba)
-            static bool mostrado = false;
-            if (!mostrado) {
-                printf("🔧 Ejecutando en modo local - Esperando servidor...\n");
-                mostrado = true;
-            }
+        // 3. MAQUINA DE ESTADOS - RENDERIZADO
+        BeginDrawing();
+        
+        switch (estado_menu) {
+            case MENU_MAIN:
+            case MENU_SELECT_GAME:
+            case MENU_CREATING_GAME:    // ← NUEVO: mostrar menú durante espera
+            case MENU_JOINING_GAME:     // ← NUEVO: mostrar menú durante espera
+                // SOLO MENÚ - fondo negro limpio
+                ClearBackground(BLACK);
+                dibujar_interfaz_menu(estado_menu, seleccion_actual, partidas_disponibles, cantidad_partidas, partida_seleccionada_global);
+                break;
+                
+            case MENU_PLAYING:
+            case MENU_SPECTATING:
+                // SOLO JUEGO - escena completa
+                dibujar_escena_completa(&estado_juego, &sprites_global);
+                // HUD se dibuja dentro de dibujar_escena_completa
+                break;
         }
         
-        // 4. RENDERIZAR ESCENA
-        dibujar_escena_completa(&estado, &sprites_global);
-        
-        // 5. MANEJAR ESTADO DEL JUEGO
-        if (!estado.juego_activo && servidor_conectado) {
-            // Juego terminado por el servidor
-            printf("💀 JUEGO TERMINADO - Esperando reinicio...\n");
-            
-            // Podrías agregar lógica para reiniciar o salir
-            if (IsKeyPressed(KEY_ENTER)) {
-                printf("🔄 Solicitando reinicio al servidor...\n");
-                // enviar_input_al_servidor(CLIENT_PLAYER, 1, "partida_default", "RESTART", "");
-            }
-        }
+        EndDrawing();
     }
     
     // Limpieza
     if (servidor_conectado) {
+        if (estado_menu == MENU_SPECTATING) {
+            salir_partida_espectador(partida_seleccionada_global);
+        } else if (estado_menu == MENU_PLAYING) {
+            salir_partida_jugador(partida_seleccionada_global);
+        }
+        set_partida_activa(false); // ← AGREGAR: asegurar desactivación
         desconectar_servidor();
     }
     cerrar_graficos();
     
-    printf("👋 Cliente cerrado correctamente\n");
+    printf("Cliente cerrado correctamente\n");
     return 0;
 }

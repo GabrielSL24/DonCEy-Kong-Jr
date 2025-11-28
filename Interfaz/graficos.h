@@ -2,7 +2,7 @@
 #define GRAFICOS_H
 
 #include "raylib.h"
-#include "game.h"
+#include "types.h"
 
 // Sistema de sprites
 typedef struct {
@@ -39,6 +39,7 @@ void dibujar_fondo(const SistemaSprites *sprites);
 // ==================== FUNCIONES DE RENDERIZADO ====================
 void dibujar_escena_completa(const EstadoJuego *estado, const SistemaSprites *sprites);
 void dibujar_ui(const EstadoJuego *estado);
+void dibujar_interfaz_menu(EstadoMenu estado, int seleccion, InfoPartida partidas[], int count, const char* partida_actual);
 
 // ==================== FUNCIONES DE DIBUJO DE ENTIDADES ====================
 void dibujar_jugador(const Jugador *jugador, const SistemaSprites *sprites);
@@ -51,5 +52,7 @@ void dibujar_plataformas(const Plataforma plataformas[], int num_plataformas);
 // ==================== FUNCIONES DE DEBUG ====================
 void dibujar_debug_info(const EstadoJuego *estado);
 void dibujar_hitboxes(const EstadoJuego *estado);
+
+
 
 #endif

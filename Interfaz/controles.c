@@ -73,25 +73,30 @@ bool tecla_espacio_presionada(void) {
 void detectar_inputs_frame(FrameInputs *frame_inputs) {
     // Inicializar el frame
     frame_inputs->num_inputs = 0;
+    frame_inputs->enter_pressed = false;
+    frame_inputs->escape_pressed = false;
+    frame_inputs->backspace_pressed = false;
+    frame_inputs->seleccion_menu = 0;
     
-    // KEY PRESSED
-    if (IsKeyDown(KEY_LEFT)) {
-        strcpy(frame_inputs->inputs[frame_inputs->num_inputs++], "LEFT");
+    // ✅ CORREGIDO: Usar solo KEY_PRESSED y KEY_RELEASED
+    // KEY PRESSED (solo cuando se presiona por primera vez)
+    if (IsKeyPressed(KEY_LEFT)) {
+        strcpy(frame_inputs->inputs[frame_inputs->num_inputs++], "LEFT_PRESSED");
     }
-    if (IsKeyDown(KEY_RIGHT)) {
-        strcpy(frame_inputs->inputs[frame_inputs->num_inputs++], "RIGHT");
+    if (IsKeyPressed(KEY_RIGHT)) {
+        strcpy(frame_inputs->inputs[frame_inputs->num_inputs++], "RIGHT_PRESSED");
     }
-    if (IsKeyDown(KEY_UP)) {
-        strcpy(frame_inputs->inputs[frame_inputs->num_inputs++], "UP");
+    if (IsKeyPressed(KEY_UP)) {
+        strcpy(frame_inputs->inputs[frame_inputs->num_inputs++], "UP_PRESSED");
     }
-    if (IsKeyDown(KEY_DOWN)) {
-        strcpy(frame_inputs->inputs[frame_inputs->num_inputs++], "DOWN");
+    if (IsKeyPressed(KEY_DOWN)) {
+        strcpy(frame_inputs->inputs[frame_inputs->num_inputs++], "DOWN_PRESSED");
     }
-    if (IsKeyDown(KEY_SPACE)) {
-        strcpy(frame_inputs->inputs[frame_inputs->num_inputs++], "JUMP");
+    if (IsKeyPressed(KEY_SPACE)) {
+        strcpy(frame_inputs->inputs[frame_inputs->num_inputs++], "JUMP_PRESSED");
     }
     
-    // KEY RELEASED (opcional, para movimiento más preciso)
+    // KEY RELEASED (cuando se suelta la tecla)
     if (IsKeyReleased(KEY_LEFT)) {
         strcpy(frame_inputs->inputs[frame_inputs->num_inputs++], "LEFT_RELEASED");
     }
@@ -108,9 +113,22 @@ void detectar_inputs_frame(FrameInputs *frame_inputs) {
         strcpy(frame_inputs->inputs[frame_inputs->num_inputs++], "JUMP_RELEASED");
     }
     
-    // Debug: mostrar inputs detectados
+    // Inputs para menú (se mantienen igual)
+    frame_inputs->enter_pressed = IsKeyPressed(KEY_ENTER);
+    frame_inputs->escape_pressed = IsKeyPressed(KEY_ESCAPE);
+    frame_inputs->backspace_pressed = IsKeyPressed(KEY_BACKSPACE);
+    
+    // Navegación en menú
+    if (IsKeyPressed(KEY_UP)) {
+        frame_inputs->seleccion_menu = -1;
+    }
+    if (IsKeyPressed(KEY_DOWN)) {
+        frame_inputs->seleccion_menu = 1;
+    }
+    
+    // Debug
     if (frame_inputs->num_inputs > 0) {
-        printf("🎮 Inputs detectados en frame: ");
+        printf("🎮 Inputs detectados: ");
         for (int i = 0; i < frame_inputs->num_inputs; i++) {
             printf("%s ", frame_inputs->inputs[i]);
         }

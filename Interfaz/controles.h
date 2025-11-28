@@ -5,10 +5,16 @@
 
 #define MAX_INPUTS_PER_FRAME 10
 
-// Estructura para inputs por frame (DEFINIDA UNA SOLA VEZ)
+// Estructura para inputs por frame (EXTENDIDA)
 typedef struct {
     char inputs[MAX_INPUTS_PER_FRAME][20]; // "LEFT_PRESSED", "RIGHT_RELEASED", etc.
     int num_inputs;
+    
+    // Nuevos inputs para menú
+    bool enter_pressed;
+    bool escape_pressed;
+    bool backspace_pressed;
+    int seleccion_menu; // Para navegación (-1 = arriba, 1 = abajo, 0 = sin cambio)
 } FrameInputs;
 
 // Estructura simplificada alternativa
