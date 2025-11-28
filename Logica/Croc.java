@@ -75,4 +75,9 @@ public abstract class Croc {
     protected void kill() {
         this.alive = false;
     }
+
+    public void update(float multiplier) {
+        update();
+    }
+
 }

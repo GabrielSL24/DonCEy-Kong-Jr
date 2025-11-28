@@ -108,6 +108,24 @@ public final class Player {
         lives += 1;
     }
 
+
+    /**
+     * Entrada: centerX, centerY (nueva posición del centro).
+     * Restricción: Ningún parámetro debe ser null.
+     * Salida: Reposiciona al jugador y reinicia su estado físico.
+     */
+    public void resetTo(final Integer centerX, final Integer centerY) {
+        if (centerX == null || centerY == null) {
+            return;
+        }
+        this.xCenter = centerX;
+        this.yCenter = centerY;
+        this.velocityX = 0.0f;
+        this.velocityY = 0.0f;
+        this.state = PlayerState.GROUND;
+        this.attachedVineId = null;
+    }
+
     // ==================== BUCLE DE ACTUALIZACIÓN ====================
 
     /**

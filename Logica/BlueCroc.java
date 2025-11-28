@@ -15,24 +15,25 @@ public final class BlueCroc extends Croc {
      * @param initialY  posición vertical inicial.
      * @param speed     velocidad de movimiento (se fuerza a mínimo 1).
      */
-    public BlueCroc(final Vine vine,
-                    final Integer initialY,
-                    final Integer speed) {
-        super(vine, initialY);
-        if (speed == null) {
-            throw new IllegalArgumentException("speed must not be null");
-        }
-        this.speed = Math.max(1, speed);
+    public BlueCroc(final Vine vine) {
+        super(vine, vine.getYTop());
+        this.speed = 1;
     }
 
     @Override
     public void update() {
+        update(1.0f);
+    }
+
+    @Override
+    public void update(float speedMultiplier) {
         if (!alive) {
             return;
         }
 
         int iy = y;
-        final int s = speed;
+        final int baseSpeed = speed;
+        final int s = Math.max(1, Math.round(baseSpeed * speedMultiplier));
         iy += s;
 
         final int bottom = vine.getYBottom();

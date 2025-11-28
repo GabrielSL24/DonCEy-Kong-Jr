@@ -10,6 +10,8 @@ import java.util.Map;
 public final class CrocManager {
 
     private final Map<Integer, Croc> crocsByVine = new HashMap<>();
+    private float speedMultiplier = 1.0f;
+
 
     /**
      * Indica si se puede crear un nuevo cocodrilo en la liana dada.
@@ -45,7 +47,7 @@ public final class CrocManager {
     public void updateAll() {
         for (Croc croc : crocsByVine.values()) {
             if (croc != null && croc.isAlive()) {
-                croc.update();
+                croc.update(speedMultiplier);
             }
         }
     }
@@ -72,4 +74,13 @@ public final class CrocManager {
     public void clear() {
         crocsByVine.clear();
     }
+
+    public void increaseSpeedMultiplier() {
+        speedMultiplier += 0.25f; 
+    }
+
+    public float getSpeedMultiplier() {
+        return speedMultiplier;
+    }
+
 }
