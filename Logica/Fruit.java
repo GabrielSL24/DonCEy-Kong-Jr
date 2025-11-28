@@ -5,7 +5,7 @@
  * al ser recogida y luego pasa a estado inactivo.
  */
 public final class Fruit {
-
+    private final Integer id; 
     private final Integer x;
     private final Integer y;
     private final Integer points;
@@ -18,7 +18,8 @@ public final class Fruit {
      * @param y      coordenada Y del centro de la fruta, en píxeles.
      * @param points puntos que otorga al ser recogida.
      */
-    public Fruit(final Integer x,
+    public Fruit(final Integer id,
+                 final Integer x,
                  final Integer y,
                  final Integer points) {
         if (x == null || y == null || points == null) {
@@ -27,6 +28,7 @@ public final class Fruit {
         this.x = x;
         this.y = y;
         this.points = points;
+        this.id = id;
     }
 
     /**
@@ -63,6 +65,10 @@ public final class Fruit {
      */
     public void collect() {
         active = false;
+    }
+
+    public Integer getId() {
+        return id;
     }
 
     /**
